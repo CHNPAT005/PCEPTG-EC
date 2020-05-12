@@ -36,7 +36,7 @@ The simulation function requires 4 input variables:
 
 ```julia
 
-include("../Functions/Hawkes/Hawkes")
+include("Functions/Hawkes/Hawkes")
 
 # Setting the parameters
 lambda0 = [0.016 0.016]
@@ -57,7 +57,7 @@ The calibration uses the Optim package in Julia.
 
 ```julia
 
-include("../Functions/Hawkes/Hawkes")
+include("Functions/Hawkes/Hawkes")
 
 # Function to be used in optimization for the above simulation
 function calibrateHawkes(param)
@@ -74,4 +74,37 @@ par = Optim.minimizer(res)
 ```
 
 ### Estimators
+
+The estimators include the Malliavin-Mancino estimator and the Hayashi-Yoshida estimator.
+For details on usage of the Malliavin-Mancino estimator, please refer to our previous work: [Malliavin-Mancino estimators implemented with non-uniform fast Fourier transforms](https://github.com/CHNPAT005/PCEPTG-MM-NUFFT).
+
+The Hayashi-Yoshida estimator takes in the vectors of prices (can be asynchronous), along with their associated trade times.
+
+#### Example
+
+```julia
+
+include("Functions/Correlation Estimators/HY/HYcorr")
+include("Functions/SDEs/GBM")
+
+# Create some data
+mu = [0.01/86400, 0.01/86400]
+sigma = [0.1/86400 sqrt(0.1/86400)*0.35*sqrt(0.2/86400);
+        sqrt(0.1/86400)*0.35*sqrt(0.2/86400) 0.2/86400]
+
+P = GBM(10000, mu, sigma, seed = 10)
+P1 = P[:,1] ; P2 = P[:,2]
+t1= collect(1:1:10000); t2= collect(1:1:10000)
+
+# Obtain results
+output = HYcorr(P1,P2,t1,t2)
+
+# Extract results
+cor1 = output1[1]
+cov1 = output1[2]
+
+```
+
+
+
 
