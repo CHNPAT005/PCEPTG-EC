@@ -1,10 +1,11 @@
-# using JLD; using LaTeXStrings; using Plots; using Statistics; using CSV;
-# using Optim; using Distributions
+## Author: Patrick Chang
+# Script file to investigate the correction of the Epps effect arising
+# from asynchronous sampling on 40 days of JSE data
 
 using LinearAlgebra, Plots, LaTeXStrings, StatsBase, Intervals, JLD, ProgressMeter, Distributions, CSV
 #---------------------------------------------------------------------------
 
-cd("/Users/patrickchang1/PCEPTG-JR-MM")
+cd("/Users/patrickchang1/PCEPTG-EC")
 
 include("../../Functions/Hawkes/Hawkes")
 include("../../Functions/SDEs/GBM")
@@ -57,25 +58,11 @@ end
 
 #---------------------------------------------------------------------------
 # Read in the data
-# days = ["2019-06-24", "2019-06-25", "2019-06-26", "2019-06-27", "2019-06-28"]
 days = ["2019-05-02"; "2019-05-03"; "2019-05-06"; "2019-05-07"; "2019-05-09"; "2019-05-10"; "2019-05-13"; "2019-05-14";
         "2019-05-15"; "2019-05-16"; "2019-05-17"; "2019-05-20"; "2019-05-21"; "2019-05-22"; "2019-05-23"; "2019-05-24";
         "2019-05-27"; "2019-05-28"; "2019-05-29"; "2019-05-30"; "2019-05-31"; "2019-06-03"; "2019-06-04"; "2019-06-05";
         "2019-06-06"; "2019-06-07"; "2019-06-10"; "2019-06-11"; "2019-06-12"; "2019-06-13"; "2019-06-14"; "2019-06-18";
         "2019-06-19"; "2019-06-20"; "2019-06-21"; "2019-06-24"; "2019-06-25"; "2019-06-26"; "2019-06-27"; "2019-06-28"]
-
-# FSRSOL_Data = Matrix{Float64}[]
-# ABGMNP_Data = Matrix{Float64}[]
-#
-# for i in 1:length(days)
-#     pFSRSOL = CSV.read("Real Data/JSE_FSR_SOL_"*days[i]*".csv")
-#     pFSRSOL = convert(Matrix, pFSRSOL[:,2:4])
-#     push!(FSRSOL_Data, pFSRSOL)
-#
-#     pABGMNP = CSV.read("Real Data/JSE_ABG_MNP_"*days[i]*".csv")
-#     pABGMNP = convert(Matrix, pABGMNP[:,2:4])
-#     push!(ABGMNP_Data, pABGMNP)
-# end
 
 JSE_Data = Matrix{Float64}[]
 for i in 1:length(days)
@@ -83,24 +70,6 @@ for i in 1:length(days)
     p = convert(Matrix, p[:,2:12])
     push!(JSE_Data, p)
 end
-
-# FSRSOL_Data = Matrix{Float64}[] #Actually FSR/SBK
-# for i in 1:length(days)
-#     p = JSE_Data[i][:,[1;7;11]]
-#     push!(FSRSOL_Data, p)
-# end
-#
-# ABGMNP_Data = Matrix{Float64}[] #Actually NED/ABG
-# for i in 1:length(days)
-#     p = JSE_Data[i][:,[1;8;9]]
-#     push!(ABGMNP_Data, p)
-# end
-#
-# MNPSHP_Data = Matrix{Float64}[]
-# for i in 1:length(days)
-#     p = JSE_Data[i][:,[1;5;10]]
-#     push!(MNPSHP_Data, p)
-# end
 
 # Function to clean the data such that both assets start when the slower
 # asset makes its first trade. Using Previous tick interpolation to interpolate
@@ -142,15 +111,7 @@ function fixdata(data)
     return Fixed_Data
 end
 
-# Cleaned the data to the required format
-FSRSOL_Data_fixed = fixdata(FSRSOL_Data)
-ABGMNP_Data_fixed = fixdata(ABGMNP_Data)
-MNPSHP_Data_fixed = fixdata(MNPSHP_Data)
-
-# Compute correlations and corrections
-T = 28200
-dt = collect(1:1:400)
-
+# Function to compute the correlations and corrections
 function computecorrs(data, T = 28200, dt = collect(1:1:400))
     m = size(data)[1]
     measured = zeros(length(dt), m)
@@ -187,7 +148,6 @@ function computecorrs(data, T = 28200, dt = collect(1:1:400))
 end
 
 # Streamline everything
-
 function Empirical(A1::Int64, A2::Int64, Fulldata)
     Data = Matrix{Float64}[] #Actually FSR/SBK
     for i in 1:length(days)
@@ -200,26 +160,21 @@ function Empirical(A1::Int64, A2::Int64, Fulldata)
 end
 #---------------------------------------------------------------------------
 # Compute results
-SOLFSR = Empirical(6, 11, JSE_Data)
-MNPABG = Empirical(5, 9, JSE_Data)
-NPNSOL = Empirical(3, 6, JSE_Data)
-NPNFSR = Empirical(3, 11, JSE_Data)
-BTISHP = Empirical(2, 10, JSE_Data)
 
-MNPSHP = Empirical(5, 10, JSE_Data)
-
-SBKNED = Empirical(7, 8, JSE_Data)
-SBKABG = Empirical(7, 9, JSE_Data)
-FSRNED = Empirical(11, 8, JSE_Data)
-FSRABG = Empirical(11, 9, JSE_Data)
-
+# Each take roughly 30 min
 SBKFSR = Empirical(7, 11, JSE_Data)
 NEDABG = Empirical(8, 9, JSE_Data)
 
-ptest = plot(dt, mean(NPNFSR[1], dims=2) ./ maximum(mean(NPNFSR[1], dims=2)), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured NED/ABG}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.55))
-plot!(ptest, dt, mean(NPNFSR[3], dims=2) ./ maximum(mean(NPNFSR[1], dims=2)), color = :blue, line=(1, [:solid]), label = L"\textrm{Overlap correction NED/ABG}", marker=([:circle :d],1,0,stroke(2,:blue)))
+# Save and Load
+save("Computed Data/EppsCorrection/Empirical.jld", "SBKFSR", SBKFSR, "NEDABG", NEDABG)
+
+ComputedResults = load("Computed Data/EppsCorrection/Empirical.jld")
+SBKFSR = ComputedResults["SBKFSR"]
+NEDABG = ComputedResults["NEDABG"]
 
 # Plots
+dt = collect(1:1:400)
+m = size(JSE_Data)[1]
 q = quantile.(TDist(m-1), [0.975])
 
 p1 = plot(dt, mean(SBKFSR[1], dims=2), ribbon=(q .* std(SBKFSR[1], dims = 2)), fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0.1, 1.55))
@@ -268,173 +223,3 @@ xlabel!(p2, L"\Delta t\textrm{[sec]}")
 ylabel!(p2, L"\rho(\Delta t)")
 
 # savefig(p2, "Plots/Empirical/NEDABGcorrectionNOerrorbars.svg")
-
-
-
-
-
-
-
-# FSRSOL_corr = computecorrs(FSRSOL_Data_fixed)
-# FSRSOL_measured = FSRSOL_corr[1]
-# FSRSOL_prevtick = FSRSOL_corr[2]
-# FSRSOL_flattime = FSRSOL_corr[3]
-# FSRSOL_HY = FSRSOL_corr[4]
-#
-# FSRSOL_measured = FSRSOL_measured ./ maximum(FSRSOL_measured)
-# FSRSOL_measured = FSRSOL_measured ./ maximum(FSRSOL_measured)
-# FSRSOL_measured = FSRSOL_measured ./ maximum(FSRSOL_measured)
-#
-# plot(dt, FSRSOL_measured)
-#
-# p1 = plot(dt, mean(FSRSOL_measured, dims=2) ./ maximum(mean(FSRSOL_measured, dims=2)), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.55))
-# # plot!(p1, dt, mean(FSRSOL_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p1, dt[2:end], (mean(FSRSOL_flattime, dims=2) ./ maximum(mean(FSRSOL_measured, dims=2)))[2:end], color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# hline!(p1, [mean(FSRSOL_HY)] / maximum(mean(FSRSOL_measured, dims=2)), color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p1, L"\Delta t\textrm{[sec]}")
-# ylabel!(p1, L"\rho(\Delta t)")
-#
-# # savefig(p1, "Plots/Empirical/lam13.5.svg")
-#
-# ABGMNP_corr = computecorrs(ABGMNP_Data_fixed)
-# ABGMNP_measured = ABGMNP_corr[1]
-# ABGMNP_prevtick = ABGMNP_corr[2]
-# ABGMNP_flattime = ABGMNP_corr[3]
-# ABGMNP_HY = ABGMNP_corr[4]
-#
-# plot(dt, ABGMNP_measured)
-#
-# p2 = plot(dt, mean(ABGMNP_measured, dims=2) ./ maximum(mean(ABGMNP_measured, dims=2)), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.55))
-# # plot!(p2, dt, mean(ABGMNP_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p2, dt, mean(ABGMNP_flattime, dims=2) ./ maximum(mean(ABGMNP_measured, dims=2)), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# hline!(p2, [mean(ABGMNP_HY)] ./ maximum(mean(ABGMNP_measured, dims=2)), color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p2, L"\Delta t\textrm{[sec]}")
-# ylabel!(p2, L"\rho(\Delta t)")
-#
-# # savefig(p2, "Plots/Empirical/lam21.svg")
-#
-#
-# MNPSHP_corr = computecorrs(MNPSHP_Data_fixed)
-# MNPSHP_measured = MNPSHP_corr[1]
-# MNPSHP_prevtick = MNPSHP_corr[2]
-# MNPSHP_flattime = MNPSHP_corr[3]
-# MNPSHP_HY = MNPSHP_corr[4]
-#
-# plot(dt, MNPSHP_measured)
-#
-# p3 = plot(dt, mean(MNPSHP_measured, dims=2) ./ maximum(mean(MNPSHP_measured, dims=2)), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)#, ylims = (0, 1.55))
-# # plot!(p3, dt, mean(MNPSHP_prevtick, dims=2), ribbon=MNPSHP_measured, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p3, dt, mean(MNPSHP_flattime, dims=2) ./ maximum(mean(MNPSHP_measured, dims=2)), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# hline!(p3, [mean(MNPSHP_HY)] ./ maximum(mean(MNPSHP_measured, dims=2)), color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p3, L"\Delta t\textrm{[sec]}")
-# ylabel!(p3, L"\rho(\Delta t)")
-#
-# # savefig(p3, "Plots/Empirical/lam21.svg")
-#
-#
-# p4 = plot(dt, mean(FSRSOL_flattime, dims=2) ./ maximum(mean(FSRSOL_measured, dims=2)), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{FSR/SBK}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.55))
-# # plot!(p4, dt, mean(MNPSHP_flattime, dims=2) ./ maximum(mean(MNPSHP_measured, dims=2)), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# plot!(p4, dt, mean(ABGMNP_flattime, dims=2) ./ maximum(mean(ABGMNP_measured, dims=2)), color = :green, line=(1, [:solid]), label = L"\textrm{NED/ABG}", marker=([:circle :d],1,0,stroke(2,:green)))
-#
-#
-#
-# q = quantile.(TDist(40-1), [0.975])
-#
-# err_measured_GBM_exp = (q .* std(FSRSOL_measured, dims = 2))
-# err_measured_GBM_prevtick_exp = (q .* std(FSRSOL_prevtick, dims = 2))
-# err_measured_GBM_flattime_adj_exp = (q .* std(FSRSOL_flattime, dims = 2))
-# err_HYGBM_exp = (q .* std(FSRSOL_HY))
-#
-# p2 = plot(dt, mean(FSRSOL_measured, dims=2), ribbon=err_measured_GBM_exp, fillalpha=.15, legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# # plot!(p2, dt, mean(FSRSOL_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p2, dt, mean(FSRSOL_flattime, dims=2), ribbon=err_measured_GBM_flattime_adj_exp, fillalpha=0.3, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# hline!(p2, [mean(FSRSOL_HY)], ribbon=err_HYGBM_exp, fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p2, L"\Delta t\textrm{[sec]}")
-# ylabel!(p2, L"\rho(\Delta t)")
-#
-#
-#
-#
-# q = quantile.(TDist(40-1), [0.975])
-#
-# err_measured_GBM_exp = (q .* std(ABGMNP_measured, dims = 2))
-# err_measured_GBM_prevtick_exp = (q .* std(ABGMNP_prevtick, dims = 2))
-# err_measured_GBM_flattime_adj_exp = (q .* std(ABGMNP_flattime, dims = 2))
-# err_HYGBM_exp = (q .* std(ABGMNP_HY))
-#
-# p2 = plot(dt, mean(ABGMNP_measured, dims=2), ribbon=err_measured_GBM_exp, fillalpha=.15, legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# # plot!(p2, dt, mean(ABGMNP_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p2, dt, mean(ABGMNP_flattime, dims=2), ribbon=err_measured_GBM_flattime_adj_exp, fillalpha=0.3, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-# hline!(p2, [mean(ABGMNP_HY)], ribbon=err_HYGBM_exp, fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p2, L"\Delta t\textrm{[sec]}")
-# ylabel!(p2, L"\rho(\Delta t)")
-
-
-#---------------------------------------------------------------------------
-
-function computefullcorrs(data, T = 28200, dt = collect(1:1:400))
-    m = size(data)[1]
-    measured = zeros(length(dt), 1)
-    prevtick = zeros(length(dt), 1)
-    overlap = zeros(length(dt), 1)
-    # HY = zeros(1, 1)
-
-    temp = data[1]
-    for k in 2:m
-        timeupdate = data[k][:,1]
-        timeupdate = timeupdate .+ (T*(k-1))
-        temp = [temp; [timeupdate data[k][:,2:3]]]
-    end
-
-    t1 = temp[findall(!isnan, temp[:,2]),1]
-    t2 = temp[findall(!isnan, temp[:,3]),1]
-
-    for i in 1:length(dt)
-        t = collect(0:dt[i]:T*m)
-        n = length(t)
-        p1 = zeros(n,1)
-        p2 = zeros(n,1)
-        for j in 1:n
-            inds = findall(x -> x .<= t[j], temp[:,1])
-            p1[j] = filter(!isnan, temp[inds,2])[end]
-            p2[j] = filter(!isnan, temp[inds,3])[end]
-        end
-        p = zeroticks([p1 p2])
-        adj = flattime(dt[i], t1[2:end], t2[2:end], T)
-
-        measured[i] = NUFFTcorrDKFGG([p1 p2], [t t])[1][1,2]
-        prevtick[i] = measured[i] * ((1-p[1]*p[2]) / ((1-p[1])*(1-p[2])))
-        overlap[i] = measured[i]/adj
-    end
-    # P1 = filter(!isnan, temp[:,2])
-    # P2 = filter(!isnan, temp[:,3])
-    # HY = HYcorr(P1,P2,t1,t2)[1][1,2]
-
-    return measured, prevtick, overlap#, HY
-end
-
-FSRSOL_fullcorr = computefullcorrs(FSRSOL_Data_fixed)
-FSRSOL_measured = FSRSOL_fullcorr[1]
-FSRSOL_prevtick = FSRSOL_fullcorr[2]
-FSRSOL_flattime = FSRSOL_fullcorr[3]
-FSRSOL_HY = FSRSOL_fullcorr[4]
-
-p1 = plot(dt, FSRSOL_measured ./ maximum(FSRSOL_measured), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# plot!(p1, dt, mean(FSRSOL_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p1, dt, FSRSOL_flattime ./ maximum(FSRSOL_measured), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p1, [FSRSOL_HY / maximum(FSRSOL_measured)], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-xlabel!(p1, L"\Delta t\textrm{[sec]}")
-ylabel!(p1, L"\rho(\Delta t)")
-
-ABGMNP_fullcorr = computefullcorrs(ABGMNP_Data_fixed)
-ABGMNP_measured = ABGMNP_fullcorr[1]
-ABGMNP_prevtick = ABGMNP_fullcorr[2]
-ABGMNP_flattime = ABGMNP_fullcorr[3]
-ABGMNP_HY = ABGMNP_fullcorr[4]
-
-p2 = plot(dt, ABGMNP_measured ./ maximum(ABGMNP_measured), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# plot!(p1, dt, mean(ABGMNP_prevtick, dims=2), ribbon=err_measured_GBM_prevtick_exp, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p2, dt, ABGMNP_flattime ./ maximum(ABGMNP_measured), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p2, [ABGMNP_HY / maximum(ABGMNP_measured)], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-xlabel!(p2, L"\Delta t\textrm{[sec]}")
-ylabel!(p2, L"\rho(\Delta t)")

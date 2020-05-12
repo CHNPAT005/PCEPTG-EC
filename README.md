@@ -24,14 +24,14 @@ Link to the Dataset: [Link](https://zivahub.uct.ac.za/articles/Malliavin-Mancino
 ## Using the functions for other purposes:
 ### Hawkes
 
-We have included a variety of functions for a multivariate Hawkes process with single exponential kernel.
+We have included a variety of functions for a M-variate Hawkes process with single exponential kernel.
 
 #### Simulation Example
 
 The simulation function requires 4 input variables:
 - lambda0: the constant base-line intensity
-- alpha: nxn matrix of alphas in the exponential kernel
-- beta: nxn matrix of betas in the exponential kernel
+- alpha: MxM matrix of alphas in the exponential kernel
+- beta: MxM matrix of betas in the exponential kernel
 - T: the time horizon of the simulation
 
 ```julia
@@ -73,4 +73,5 @@ par = Optim.minimizer(res)
 
 ```
 
+### Estimators
 
