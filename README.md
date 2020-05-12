@@ -51,6 +51,26 @@ t = simulateHawkes(lambda0, alpha, beta, T)
 
 #### Calibration Example
 
+The calibration requires the user to decide on how many parameters to estimate and write a small function to initialise the input matrix of lambda0, alpha and beta and invoke the log-likelihood.
 
+The calibration uses the Optim package in Julia.
+
+```julia
+
+include("../Functions/Hawkes/Hawkes")
+
+# Function to be used in optimization for the above simulation
+function calibrateHawkes(param)
+    lambda0 = [param[1] param[1]]
+    alpha = [0 param[2]; param[2] 0]
+    beta = [0 param[3]; param[3] 0]
+    return -loglikeHawkes(t, lambda0, alpha, beta, T)
+end
+
+# Optimize the parameters using Optim
+res = optimize(calibrateHawkes, [0.01, 0.015, 0.15])
+par = Optim.minimizer(res)
+
+```
 
 

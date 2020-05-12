@@ -552,6 +552,7 @@ measured_hawkes_flattime_adj_exp_lam1 = zeros(length(dt), reps)
 measured_hawkes_flattime_adj_exp_lam10 = zeros(length(dt), reps)
 measured_hawkes_flattime_adj_exp_lam25 = zeros(length(dt), reps)
 
+# Takes roughly 24 hours to compute
 @showprogress "Computing..." for k in 1:reps
     lam1 = 1
     Random.seed!(k)
