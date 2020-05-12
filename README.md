@@ -22,3 +22,35 @@ Link to the Dataset: [Link](https://zivahub.uct.ac.za/articles/Malliavin-Mancino
 - We have included the plots under `/Plots` and Computed results under `/Computed Data` if one does not wish to re-run everything.
 
 ## Using the functions for other purposes:
+### Hawkes
+
+We have included a variety of functions for a multivariate Hawkes process with single exponential kernel.
+
+#### Simulation Example
+
+The simulation function requires 4 input variables:
+- lambda0: the constant base-line intensity
+- alpha: nxn matrix of alphas in the exponential kernel
+- beta: nxn matrix of betas in the exponential kernel
+- T: the time horizon of the simulation
+
+```julia
+
+include("../Functions/Hawkes/Hawkes")
+
+# Setting the parameters
+lambda0 = [0.016 0.016]
+alpha = [0 0.023; 0.023 0]
+beta = [0 0.11; 0.11 0]
+T = 3600
+
+# Simulation
+t = simulateHawkes(lambda0, alpha, beta, T)
+
+```
+
+#### Calibration Example
+
+
+
+

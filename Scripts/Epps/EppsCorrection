@@ -365,6 +365,7 @@ measured_hawkes_prevtick_exp = zeros(length(dt), reps)
 measured_hawkes_flattime_adj_exp = zeros(length(dt), reps)
 HYHawkes_exp = zeros(reps, 1)
 
+# Takes roughly 2 hours to compute
 @showprogress "Computing..." for k in 1:reps
     lam = 15
     Random.seed!(k)
@@ -431,12 +432,6 @@ ylabel!(p7, L"\rho(\Delta t)")
 #---------------------------------------------------------------------------
 ## Hawkes price model with Hawkes sampling
 
-# # t = simulateHawkes([0.015;0.015], [0.023 0.023; 0.023 0.023], [0.11 0.11; 0.11 0.11], T)
-# t = simulateHawkes([0.015;0.015], [0 0.023; 0.023 0], [0 0.11; 0.11 0], T)
-#
-# t1 = [0;t[1]]
-# t2 = [0;t[2]]
-
 measured_hawkes_hawkes = zeros(length(dt), reps)
 measured_hawkes_prevtick_hawkes = zeros(length(dt), reps)
 measured_hawkes_flattime_adj_hawkes = zeros(length(dt), reps)
@@ -445,8 +440,8 @@ HYHawkes_hawkes = zeros(reps, 1)
 Random.seed!(2020)
 seeds = Int.(floor.(rand(reps) .* 1000000))
 
+# Takes roughly 12 hours to compute
 @showprogress "Computing..." for k in 1:reps
-    # t = simulateHawkes([0.015;0.015], [0.023 0.023; 0.023 0.023], [0.11 0.11; 0.11 0.11], T)
     t = simulateHawkes([0.015;0.015], [0 0.023; 0.023 0], [0 0.11; 0.11 0], T, seed = seeds[k])
 
     t1 = [0;t[1]]
@@ -475,38 +470,15 @@ seeds = Int.(floor.(rand(reps) .* 1000000))
     HYHawkes_hawkes[k] = HYcorr(P1,P2,t1,t2)[1][1,2]
 end
 
-# for i in 1:length(dt)
-#     t = collect(0:dt[i]:T)
-#     n = length(t)
-#     p1 = zeros(n,1)
-#     p2 = zeros(n,1)
-#     for j in 1:n
-#         γ1 = maximum(filter(x-> x .<= t[j], t1))
-#         γ2 = maximum(filter(x-> x .<= t[j], t2))
-#         p1[j] = exp(P_1[Int(floor(γ1)+1), 1])
-#         p2[j] = exp(P_1[Int(floor(γ2)+1), 2])
-#     end
-#     p = zeroticks([p1 p2])
-#     adj = flattime(dt[i], t1[2:end], t2[2:end], T)
-#
-#     measured_hawkes_hawkes[i] = NUFFTcorrDKFGG([p1 p2], [t t])[1][1,2]
-#     measured_hawkes_prevtick_hawkes[i] = measured_hawkes_hawkes[i] * ((1-p[1]*p[2]) / ((1-p[1])*(1-p[2])))
-#     measured_hawkes_flattime_adj_hawkes[i] = measured_hawkes_hawkes[i]/adj
-# end
+# Save and Load
+save("Computed Data/EppsCorrection/HawkeswHawkesSaples2.jld", "measured_hawkes_hawkes", measured_hawkes_hawkes, "measured_hawkes_prevtick_hawkes", measured_hawkes_prevtick_hawkes,
+"measured_hawkes_flattime_adj_hawkes", measured_hawkes_flattime_adj_hawkes, "HYHawkes_hawkes", HYHawkes_hawkes)
 
-# P1 = exp.(P_1[Int.(floor.(t1).+1), 1])
-# P2 = exp.(P_1[Int.(floor.(t2).+1), 2])
-# HYHawkes_hawkes = HYcorr(P1,P2,t1,t2)
-
-# # Save and Load
-# save("Computed Data/EppsCorrection/HawkeswHawkesSaples2.jld", "measured_hawkes_hawkes", measured_hawkes_hawkes, "measured_hawkes_prevtick_hawkes", measured_hawkes_prevtick_hawkes,
-# "measured_hawkes_flattime_adj_hawkes", measured_hawkes_flattime_adj_hawkes, "HYHawkes_hawkes", HYHawkes_hawkes)
-#
-# HawkeswHawkesSaples = load("Computed Data/EppsCorrection/HawkeswHawkesSaples2.jld")
-# measured_hawkes_hawkes = HawkeswHawkesSaples["measured_hawkes_hawkes"]
-# measured_hawkes_prevtick_hawkes = HawkeswHawkesSaples["measured_hawkes_prevtick_hawkes"]
-# measured_hawkes_flattime_adj_hawkes = HawkeswHawkesSaples["measured_hawkes_flattime_adj_hawkes"]
-# HYHawkes_hawkes = HawkeswHawkesSaples["HYHawkes_hawkes"]
+HawkeswHawkesSaples = load("Computed Data/EppsCorrection/HawkeswHawkesSaples2.jld")
+measured_hawkes_hawkes = HawkeswHawkesSaples["measured_hawkes_hawkes"]
+measured_hawkes_prevtick_hawkes = HawkeswHawkesSaples["measured_hawkes_prevtick_hawkes"]
+measured_hawkes_flattime_adj_hawkes = HawkeswHawkesSaples["measured_hawkes_flattime_adj_hawkes"]
+HYHawkes_hawkes = HawkeswHawkesSaples["HYHawkes_hawkes"]
 
 q = quantile.(TDist(reps-1), [0.975])
 
@@ -526,19 +498,6 @@ ylabel!(p8, L"\rho(\Delta t)")
 
 # savefig(p8, "Plots/EppsCorrection2/HawkesPriceModelwHawkesSamples.svg")
 
-# # Plot
-# p8 = plot(dt, measured_hawkes_hawkes, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{RV}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# plot!(p8, dt, measured_hawkes_prevtick_hawkes, color = :blue, line=(1, [:solid]), label = L"\textrm{RV}_p", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p8, dt, measured_hawkes_flattime_adj_hawkes, color = :green, line=(1, [:solid]), label = L"\textrm{RV}_{adj}", marker=([:circle :d],1,0,stroke(2,:green)))
-# plot!(p8, dt, theoretical, color = :black, line=(2, [:solid]), label = L"\textrm{Theoretical Synchronous Epps}")
-# hline!(p8, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Limiting } \rho")
-# hline!(p8, [HYHawkes_hawkes[1][1,2]], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-# xlabel!(p8, L"\Delta t\textrm{[sec]}")
-# ylabel!(p8, L"\rho(\Delta t)")
-
-# savefig(p8, "Plots/EppsCorrection/HawkesPriceModelwHawkesSamples.svg")
-
-
 #---------------------------------------------------------------------------
 ## How the sampling frequency affects the HY: Hypothesis, botton down events
 ## require time to build up correlation, therefore when sampling freq is high
@@ -547,6 +506,7 @@ ylabel!(p8, L"\rho(\Delta t)")
 lamrange = collect(1:45)
 HYlam = zeros(length(lamrange), reps)
 
+# Takes roughly 2.5 hours to compute
 @showprogress "Computing..." for k in 1:reps
     for i in 1:length(lamrange)
         lam = lamrange[i]
@@ -566,28 +526,11 @@ HYlam = zeros(length(lamrange), reps)
     end
 end
 
-# for i in 1:length(lamrange)
-#     lam = lamrange[i]
-#     Random.seed!(i)
-#     t1 = [0; rexp(T, lam)]
-#     t1 = cumsum(t1)
-#     t1 = filter((x) -> x < T, t1)
-#
-#     Random.seed!(i + 100)
-#     t2 = [0; rexp(T, lam)]
-#     t2 = cumsum(t2)
-#     t2 = filter((x) -> x < T, t2)
-#
-#     P1 = exp.(P_1[Int.(floor.(t1).+1), 1])
-#     P2 = exp.(P_1[Int.(floor.(t2).+1), 2])
-#     HYlam[i] = HYcorr(P1,P2,t1,t2)[1][1,2]
-# end
+# Save and Load
+save("Computed Data/EppsCorrection/HYFreq2.jld", "HYlam", HYlam)
 
-# # Save and Load
-# save("Computed Data/EppsCorrection/HYFreq2.jld", "HYlam", HYlam)
-#
-# HYlam = load("Computed Data/EppsCorrection/HYlam2.jld")
-# HYlam = HYlam["HYlam"]
+HYlam = load("Computed Data/EppsCorrection/HYFreq2.jld")
+HYlam = HYlam["HYlam"]
 
 q = quantile.(TDist(reps-1), [0.975])
 
@@ -600,48 +543,9 @@ ylabel!(p9, L"\rho(1/\lambda)")
 
 # savefig(p9, "Plots/EppsCorrection2/HawkesPriceModelHYSamplingFreq.svg")
 
-# # Plot
-# p9 = plot(lamrange, HYlam, ylims = (0, 0.75), color = :brown, line=(1, [:dash]), legend = :bottomright, label = L"\textrm{HY}", dpi = 300)
-# hline!(p9, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Limit } \rho")
-# xlabel!(p9, L"\textrm{Sampling frequency}[1/\lambda]")
-# ylabel!(p9, L"\rho(1/\lambda)")
-
-# savefig(p9, "Plots/EppsCorrection/HawkesPriceModelHYSamplingFreq.svg")
-
 #---------------------------------------------------------------------------
 ## How the sampling freqency affects the overlap correction, when sampling freqency
 ## is high, events don't have enough time to correlate
-
-# lam1 = 1
-# Random.seed!(1)
-# t1_lam1 = [0; rexp(T, lam1)]
-# t1_lam1 = cumsum(t1_lam1)
-# t1_lam1 = filter((x) -> x < T, t1_lam1)
-# Random.seed!(2)
-# t2_lam1 = [0; rexp(T, lam1)]
-# t2_lam1 = cumsum(t2_lam1)
-# t2_lam1 = filter((x) -> x < T, t2_lam1)
-#
-# lam10 = 10
-# Random.seed!(1)
-# t1_lam10 = [0; rexp(T, lam10)]
-# t1_lam10 = cumsum(t1_lam10)
-# t1_lam10 = filter((x) -> x < T, t1_lam10)
-# Random.seed!(2)
-# t2_lam10 = [0; rexp(T, lam10)]
-# t2_lam10 = cumsum(t2_lam10)
-# t2_lam10 = filter((x) -> x < T, t2_lam10)
-#
-# lam25 = 25
-# Random.seed!(1)
-# t1_lam25 = [0; rexp(T, lam25)]
-# t1_lam25 = cumsum(t1_lam25)
-# t1_lam25 = filter((x) -> x < T, t1_lam25)
-# Random.seed!(2)
-# t2_lam25 = [0; rexp(T, lam25)]
-# t2_lam25 = cumsum(t2_lam25)
-# t2_lam25 = filter((x) -> x < T, t2_lam25)
-
 
 dt = collect(1:1:100)
 measured_hawkes_flattime_adj_exp_lam1 = zeros(length(dt), reps)
@@ -719,59 +623,20 @@ measured_hawkes_flattime_adj_exp_lam25 = zeros(length(dt), reps)
     end
 end
 
-# for i in 1:length(dt)
-#     t = collect(0:dt[i]:T)
-#     n = length(t)
-#     p1_lam1 = zeros(n,1)
-#     p2_lam1 = zeros(n,1)
-#     p1_lam10 = zeros(n,1)
-#     p2_lam10 = zeros(n,1)
-#     p1_lam25 = zeros(n,1)
-#     p2_lam25 = zeros(n,1)
-#     for j in 1:n
-#         γ1_lam1 = maximum(filter(x-> x .<= t[j], t1_lam1))
-#         γ2_lam1 = maximum(filter(x-> x .<= t[j], t2_lam1))
-#         p1_lam1[j] = exp(P_1[Int(floor(γ1_lam1)+1), 1])
-#         p2_lam1[j] = exp(P_1[Int(floor(γ2_lam1)+1), 2])
-#
-#         γ1_lam10 = maximum(filter(x-> x .<= t[j], t1_lam10))
-#         γ2_lam10 = maximum(filter(x-> x .<= t[j], t2_lam10))
-#         p1_lam10[j] = exp(P_1[Int(floor(γ1_lam10)+1), 1])
-#         p2_lam10[j] = exp(P_1[Int(floor(γ2_lam10)+1), 2])
-#
-#         γ1_lam25 = maximum(filter(x-> x .<= t[j], t1_lam25))
-#         γ2_lam25 = maximum(filter(x-> x .<= t[j], t2_lam25))
-#         p1_lam25[j] = exp(P_1[Int(floor(γ1_lam25)+1), 1])
-#         p2_lam25[j] = exp(P_1[Int(floor(γ2_lam25)+1), 2])
-#     end
-#     adj_lam1 = flattime(dt[i], t1_lam1[2:end], t2_lam1[2:end], T)
-#     adj_lam10 = flattime(dt[i], t1_lam10[2:end], t2_lam10[2:end], T)
-#     adj_lam25 = flattime(dt[i], t1_lam25[2:end], t2_lam25[2:end], T)
-#
-#     measured_lam1 = NUFFTcorrDKFGG([p1_lam1 p2_lam1], [t t])[1][1,2]
-#     measured_hawkes_flattime_adj_exp_lam1[i] = measured_lam1/adj_lam1
-#
-#     measured_lam10 = NUFFTcorrDKFGG([p1_lam10 p2_lam10], [t t])[1][1,2]
-#     measured_hawkes_flattime_adj_exp_lam10[i] = measured_lam10/adj_lam10
-#
-#     measured_lam25 = NUFFTcorrDKFGG([p1_lam25 p2_lam25], [t t])[1][1,2]
-#     measured_hawkes_flattime_adj_exp_lam25[i] = measured_lam25/adj_lam25
-# end
-
 theoretical_lam = zeros(length(dt), 1)
 for i in 1:length(dt)
     theoretical_lam[i] = theoreticalEpps(dt[i], 0.015, 0.023, 0.05, 0.11)
 end
 
-# # Save and Load
-# save("Computed Data/EppsCorrection/HawkeswDiffSamplingFreq2.jld", "measured_hawkes_flattime_adj_exp_lam1", measured_hawkes_flattime_adj_exp_lam1, "measured_hawkes_flattime_adj_exp_lam10", measured_hawkes_flattime_adj_exp_lam10,
-# "measured_hawkes_flattime_adj_exp_lam25", measured_hawkes_flattime_adj_exp_lam25, "theoretical_lam", theoretical_lam)
-#
-# HawkeswDiffSamplingFreq = load("Computed Data/EppsCorrection/HawkeswDiffSamplingFreq2.jld")
-# measured_hawkes_flattime_adj_exp_lam1 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam1"]
-# measured_hawkes_flattime_adj_exp_lam10 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam10"]
-# measured_hawkes_flattime_adj_exp_lam25 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam25"]
-# theoretical_lam = HawkeswDiffSamplingFreq["theoretical_lam"]
+# Save and Load
+save("Computed Data/EppsCorrection/HawkeswDiffSamplingFreq2.jld", "measured_hawkes_flattime_adj_exp_lam1", measured_hawkes_flattime_adj_exp_lam1, "measured_hawkes_flattime_adj_exp_lam10", measured_hawkes_flattime_adj_exp_lam10,
+"measured_hawkes_flattime_adj_exp_lam25", measured_hawkes_flattime_adj_exp_lam25, "theoretical_lam", theoretical_lam)
+
+HawkeswDiffSamplingFreq = load("Computed Data/EppsCorrection/HawkeswDiffSamplingFreq2.jld")
+measured_hawkes_flattime_adj_exp_lam1 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam1"]
+measured_hawkes_flattime_adj_exp_lam10 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam10"]
+measured_hawkes_flattime_adj_exp_lam25 = HawkeswDiffSamplingFreq["measured_hawkes_flattime_adj_exp_lam25"]
+theoretical_lam = HawkeswDiffSamplingFreq["theoretical_lam"]
 
 q = quantile.(TDist(reps-1), [0.975])
 
@@ -787,256 +652,4 @@ hline!(p10, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Limiting }
 xlabel!(p10, L"\Delta t\textrm{[sec]}")
 ylabel!(p10, L"\rho(\Delta t)")
 
-savefig(p10, "Plots/EppsCorrection2/HawkesPriceModelwDiffSamplingFreq.svg")
-
-# # Plot
-# p10 = plot(dt, measured_hawkes_flattime_adj_exp_lam1, legend = :bottomright, color = :red, line=(1, [:solid]), label = L"1/\lambda = 1", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-# plot!(p10, dt, measured_hawkes_flattime_adj_exp_lam10, color = :blue, line=(1, [:solid]), label = L"1/\lambda = 10", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p10, dt, measured_hawkes_flattime_adj_exp_lam25, color = :green, line=(1, [:solid]), label = L"1/\lambda = 25", marker=([:circle :d],1,0,stroke(2,:green)))
-# plot!(p10, dt, theoretical_lam, color = :black, line=(2, [:solid]), label = L"\textrm{Theoretical Synchronous Epps}")
-# hline!(p10, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Limiting } \rho")
-# xlabel!(p10, L"\Delta t\textrm{[sec]}")
-# ylabel!(p10, L"\rho(\Delta t)")
-
-# savefig(p10, "Plots/EppsCorrection/HawkesPriceModelwDiffSamplingFreq.svg")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#---------------------------------------------------------------------------
-# How none stationary increments affect the corrections
-
-measured_GBM_hawkesNS = zeros(length(dt), reps)
-measured_GBM_prevtick_hawkesNS = zeros(length(dt), reps)
-measured_GBM_flattime_adj_hawkesNS = zeros(length(dt), reps)
-measured_comp = zeros(length(dt), reps)
-HYGBM_hawkesNS = zeros(reps, 1)
-
-# Seed is set this way so the Hawkes processes look different
-# this is due to how seeds are set in the Hawkes Simulation for reproducibility
-Random.seed!(2020)
-seeds = Int.(floor.(rand(reps) .* 1000000))
-par_1 = BarcyParams(0.015, 0.023, 0.05, 0.11)
-lambda0_1 = par_1[1]; alpha_1 = par_1[2]; beta_1 = par_1[3]
-
-t_hawkes = simulateHawkes(lambda0_1, alpha_1, beta_1, T, seed = 19549293)
-
-p1_1 = getuniformPrices(0, 1, T, t_hawkes[1], t_hawkes[2])
-p2_1 = getuniformPrices(0, 1, T, t_hawkes[3], t_hawkes[4])
-P_1 = [p1_1 p2_1]
-
-# takes roughly 18 hours to compute
-@showprogress "Computing..." for k in 1:reps
-    t = simulateHawkes(lambda0_1, alpha_1, beta_1, T, seed = seeds[k])
-
-    t1 = [0;sort([t[1];t[2]])]
-    t2 = [0;sort([t[3];t[4]])]
-
-    for i in 1:length(dt)
-        t = collect(0:dt[i]:T)
-        n = length(t)
-        p1 = zeros(n,1)
-        p2 = zeros(n,1)
-        for j in 1:n
-            γ1 = maximum(filter(x-> x .<= t[j], t1))
-            γ2 = maximum(filter(x-> x .<= t[j], t2))
-            p1[j] = P_GBM[Int(floor(γ1)+1), 1]
-            p2[j] = P_GBM[Int(floor(γ2)+1), 2]
-            # p1[j] = exp(P_1[Int(floor(γ1)+1), 1])
-            # p2[j] = exp(P_1[Int(floor(γ2)+1), 2])
-        end
-        p = zeroticks([p1 p2])
-        adj = flattime(dt[i], t1[2:end], t2[2:end], T)
-
-        measured_GBM_hawkesNS[i,k] = NUFFTcorrDKFGG([p1 p2], [t t])[1][1,2]
-        measured_GBM_prevtick_hawkesNS[i,k] = measured_GBM_hawkesNS[i,k] * ((1-p[1]*p[2]) / ((1-p[1])*(1-p[2])))
-        measured_GBM_flattime_adj_hawkesNS[i,k] = measured_GBM_hawkesNS[i,k]/adj
-        measured_comp[i,k] = compensated_pearson(P_1, dt[i], t1[2:end], t2[2:end], T)
-    end
-    P1 = P_GBM[Int.(floor.(t1).+1), 1]
-    P2 = P_GBM[Int.(floor.(t2).+1), 2]
-    # P1 = exp.(P_1[Int.(floor.(t1).+1), 1])
-    # P2 = exp.(P_1[Int.(floor.(t2).+1), 2])
-    HYGBM_hawkesNS[k] = HYcorr(P1,P2,t1,t2)[1][1,2]
-end
-
-# # Save and Load
-# save("Computed Data/EppsCorrection/GBMwHawkesSaplesNS2.jld", "measured_GBM_hawkesNS", measured_GBM_hawkesNS, "measured_GBM_prevtick_hawkesNS", measured_GBM_prevtick_hawkesNS,
-# "measured_GBM_flattime_adj_hawkesNS", measured_GBM_flattime_adj_hawkesNS, "HYGBM_hawkesNS", HYGBM_hawkesNS)
-#
-# GBMwHawkesSaplesNS = load("Computed Data/EppsCorrection/GBMwHawkesSaplesNS2.jld")
-# measured_GBM_hawkesNS = GBMwHawkesSaplesNS["measured_GBM_hawkesNS"]
-# measured_GBM_prevtick_hawkesNS = GBMwHawkesSaplesNS["measured_GBM_prevtick_hawkesNS"]
-# measured_GBM_flattime_adj_hawkesNS = GBMwHawkesSaplesNS["measured_GBM_flattime_adj_hawkesNS"]
-# HYGBM_hawkesNS = GBMwHawkesSaplesNS["HYGBM_hawkesNS"]
-
-q = quantile.(TDist(reps-1), [0.975])
-
-err_measured_GBM_hawkesNS = (q .* std(measured_GBM_hawkesNS, dims = 2))
-err_measured_GBM_prevtick_hawkesNS = (q .* std(measured_GBM_prevtick_hawkesNS, dims = 2))
-err_measured_GBM_flattime_adj_hawkesNS = (q .* std(measured_GBM_flattime_adj_hawkesNS, dims = 2))
-err_HYGBM_hawkesNS = (q .* std(HYGBM_hawkesNS))
-
-p11 = plot(dt, mean(measured_GBM_hawkesNS, dims=2), ribbon=err_measured_GBM_hawkesNS, fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-plot!(p11, dt, mean(measured_GBM_prevtick_hawkesNS, dims=2), ribbon=err_measured_GBM_prevtick_hawkesNS, fillalpha=.3, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p11, dt, mean(measured_GBM_flattime_adj_hawkesNS, dims=2), ribbon=err_measured_GBM_flattime_adj_hawkesNS, fillalpha=0.3, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p11, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Induced } \rho")
-hline!(p11, [mean(HYGBM_hawkesNS)], ribbon=err_HYGBM_hawkesNS, fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-xlabel!(p11, L"\Delta t\textrm{[sec]}")
-ylabel!(p11, L"\rho(\Delta t)")
-
-p11 = plot(dt, measured_GBM_hawkesNS, legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-plot!(p11, dt, measured_GBM_prevtick_hawkesNS, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-# plot!(p11, dt, measured_GBM_flattime_adj_hawkesNS, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-plot!(p11, dt, measured_comp, color = :green, line=(1, [:solid]), label = L"\textrm{Comp correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p11, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Induced } \rho")
-hline!(p11, [HYGBM_hawkesNS], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
-xlabel!(p11, L"\Delta t\textrm{[sec]}")
-ylabel!(p11, L"\rho(\Delta t)")
-
-#---------------------------------------------------------------------------
-# Guhr correction against mine
-
-function compensated_pearson(P, τ, t1, t2, T)
-    # n = size(P)[1]
-    t1 = [0; t1]
-    t2 = [0; t2]
-    syngrid = collect(0:τ:T)
-    n = length(syngrid)
-    γ1 = zeros(n,1)
-    γ2 = zeros(n,1)
-    for i in 1:n
-        γ1[i] = maximum(filter(x-> x .<= syngrid[i], t1))
-        γ2[i] = maximum(filter(x-> x .<= syngrid[i], t2))
-    end
-    ints = zeros(n-1,1)
-    # corections = ones(n-1,1)
-    for i in 2:n
-        a = γ1[i-1]..γ1[i]
-        b = γ2[i-1]..γ2[i]
-        c = intersect(a, b)
-        ints[i-1] = c.last-c.first
-        # if ints[i-1] == 0
-        #     corections[i-1] = 1
-        # else
-        #     corections[i-1] = τ / ints[i-1]
-        # end
-    end
-    p1 = zeros(n,1)
-    p2 = zeros(n,1)
-    for i in 1:n
-        p1[i] = P[Int(floor(γ1[i])+1), 1]
-        p2[i] = P[Int(floor(γ2[i])+1), 2]
-    end
-
-    ind = findall(!iszero, ints)
-    r1 = diff(log.(p1), dims=1)[ind]
-    r2 = diff(log.(p2), dims=1)[ind]
-    g1 = (r1 .- mean(r1)) ./ std(r1)
-    g2 = (r2 .- mean(r2)) ./ std(r2)
-
-    ints = ints[ind]
-    correction = τ ./ ints
-
-    cor = sum(g1.*g2.*correction) / T
-
-    # r1 = diff(log.(p1), dims=1)
-    # r2 = diff(log.(p2), dims=1)
-    # g1 = (r1 .- mean(r1)) ./ std(r1)
-    # g2 = (r2 .- mean(r2)) ./ std(r2)
-    #
-    # ind = findall(!iszero, ints)
-    # g1 = g1[ind]
-    # g2 = g2[ind]
-    # ints = ints[ind]
-    # correction = τ ./ ints
-    #
-    # cor = sum(g1.*g2.*correction) / T
-
-    # ind = findall(!iszero, ints)
-    # diffP1 = diff(log.(p1), dims=1)[ind]
-    # diffP2 = diff(log.(p2), dims=1)[ind]
-    # diffP = [diffP1 diffP2]
-    # # diffP = diff(log.([p1 p2]), dims = 1)
-    # ints = ints[ind]
-    #
-    # # corections[ind] = τ ./ ints[ind]
-    #
-    # Sigma = diffP' * diffP
-    # Sigma[1,2] = Sigma[2,1] = sum(diffP[:,1].*diffP[:,2].*(τ ./ ints))
-    # # Sigma[1,2] = Sigma[2,1] = sum(diffP[:,1].*diffP[:,2].*(corections))
-    #
-    # sd = sqrt.(diag(Sigma))
-    # res = cov2cor(Sigma, sd)
-    # cor = res[1,2]
-    return cor
-end
-
-T = 3600*20
-ρ = theoreticalCorr(0.023, 0.05, 0.11)
-
-mu = [0.01/86400, 0.01/86400]
-sigma = [0.1/86400 sqrt(0.1/86400)*ρ*sqrt(0.2/86400);
-        sqrt(0.1/86400)*ρ*sqrt(0.2/86400) 0.2/86400]
-
-P_GBM = GBM(T+1, mu, sigma)
-t_GBM = reshape([collect(0:1:T); collect(0:1:T)], T+1, 2)
-
-lam = 15
-Random.seed!(k)
-t1 = [0; rexp(T, lam)]
-t1 = cumsum(t1)
-t1 = filter((x) -> x < T, t1)
-
-Random.seed!(k+reps)
-t2 = [0; rexp(T, lam)]
-t2 = cumsum(t2)
-t2 = filter((x) -> x < T, t2)
-
-measured = zeros(length(dt), 1)
-overlapcorrection = zeros(length(dt), 1)
-Gurhcorrection = zeros(length(dt), 1)
-
-for i in 1:length(dt)
-    t = collect(0:dt[i]:T)
-    n = length(t)
-    p1 = zeros(n,1)
-    p2 = zeros(n,1)
-    for j in 1:n
-        γ1 = maximum(filter(x-> x .<= t[j], t1))
-        γ2 = maximum(filter(x-> x .<= t[j], t2))
-        p1[j] = P_GBM[Int(floor(γ1)+1), 1]
-        p2[j] = P_GBM[Int(floor(γ2)+1), 2]
-    end
-    adj = flattime(dt[i], t1[2:end], t2[2:end], T)
-
-    measured[i] = NUFFTcorrDKFGG([p1 p2], [t t])[1][1,2]
-    overlapcorrection[i] = measured[i]/adj
-    Gurhcorrection[i] = compensated_pearson(P_GBM, dt[i], t1[2:end], t2[2:end], T)
-end
-
-p11 = plot(dt, measured, legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300)
-plot!(p11, dt, Gurhcorrection, color = :blue, line=(1, [:solid]), label = L"\textrm{Guhr correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p11, dt, overlapcorrection, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p11, [ρ], color = :black, line=(2, [:dot]), label = L"\textrm{Induced } \rho")
-xlabel!(p11, L"\Delta t\textrm{[sec]}")
-ylabel!(p11, L"\rho(\Delta t)")
+# savefig(p10, "Plots/EppsCorrection2/HawkesPriceModelwDiffSamplingFreq.svg")
