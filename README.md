@@ -7,9 +7,9 @@
 
 ## Link to resources:
 
-Link to paper: 
+Link to [paper](https://arxiv.org/abs/2005.10568)
 
-Dataset DOI: 10.25375/uct.12315092
+Dataset DOI: [10.25375/uct.12315092](https://zivahub.uct.ac.za/articles/Using_the_Epps_effect_to_detect_discrete_data_generating_processes_Dataset/12315092/1)
 
 ## Steps for Replication:
 - Change directories for all the files under [/Scripts/Epps](https://github.com/CHNPAT005/PCEPTG-EC/tree/master/Scripts/Epps). Currently the directories are set as: `cd("/Users/patrickchang1/PCEPTG-EC")`. Change this to where you have stored the file `PCEPTG-EC`. 
