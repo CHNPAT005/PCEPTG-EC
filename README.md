@@ -1,4 +1,4 @@
-# Discriminating between samples from correlated continuous and discrete random events
+# Using the Epps effect to detect discrete data generating processes
 
 ## Authors:
 - Patrick Chang
