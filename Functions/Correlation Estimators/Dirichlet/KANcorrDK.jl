@@ -1,5 +1,5 @@
 ## Author: Patrick Chang
-# Script file for the MM Complex Fourier Transform (Fejer)
+# Script file for the MM Complex Fourier Transform (Dirichlet)
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
@@ -29,7 +29,7 @@ function scaleV2(t1, t2)
     return tau1, tau2
 end
 
-function KanataniFK(t1, t2, N)
+function KanataniDK(t1, t2, N)
     t1 = filter(!isnan, t1)
     t2 = filter(!isnan, t2)
     L1 = length(t1)
@@ -39,12 +39,10 @@ function KanataniFK(t1, t2, N)
 
     for i in 1:(L1-1)
         for j in 1:(L2-1)
-            t = t1[i] - t2[j]
-            if (t == 0)
+            if (t1[i] == t2[j])
                 W[i,j] = 1
             else
-                W[i,j] = (1/(N+1)) * (sin((N+1)*t/2) / sin(t/2))^2
-                #W[i,j] = (1/(N+1)) * (1-cos((N+1)*t)) / (1-cos(t))
+                W[i,j] = (1/(2*N+1)) * sin((N + 0.5) * (t1[i] - t2[j]))/sin((t1[i] - t2[j])/2)
             end
         end
     end
@@ -53,9 +51,9 @@ end
 
 #---------------------------------------------------------------------------
 
-# Kanatani Weight matrix implementaion using the Fejer Kernel
+# Kanatani Weight matrix implementaion using the Dirichlet Kernel
 
-function KANcorrFK(p1, p2, t1, t2; kwargs...)
+function KANcorrDK(p1, p2, t1, t2; kwargs...)
     t1 = filter(!isnan, t1)
     t2 = filter(!isnan, t2)
 
@@ -70,7 +68,7 @@ function KANcorrFK(p1, p2, t1, t2; kwargs...)
     # minumum step size to avoid smoothing
     dtau1 = diff(tau1)
     dtau2 = diff(tau2)
-    taumin = minimum([dtau1; dtau2])
+    taumin = maximum([dtau1; dtau2])
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -89,14 +87,14 @@ function KANcorrFK(p1, p2, t1, t2; kwargs...)
     DiffP1 = diff(log.(p1))
     DiffP2 = diff(log.(p2))
 
-    W1 = KanataniFK(tau1, tau1, N)
-    W2 = KanataniFK(tau2, tau2, N)
-    W12 = KanataniFK(tau1, tau2, N)
+    W1 = KanataniDK(tau1, tau1, N)
+    W2 = KanataniDK(tau2, tau2, N)
+    W12 = KanataniDK(tau1, tau2, N)
 
     Sigma = zeros(Float64, 2, 2)
-    Sigma[1, 1] = DiffP1' * W1 * DiffP1 /(N+1)
-    Sigma[2, 2] = DiffP2' * W2 * DiffP2 /(N+1)
-    Sigma[1, 2] = DiffP1' * W12 * DiffP2 /(N+1)
+    Sigma[1, 1] = DiffP1' * W1 * DiffP1
+    Sigma[2, 2] = DiffP2' * W2 * DiffP2
+    Sigma[1, 2] = DiffP1' * W12 * DiffP2
     Sigma[2, 1] = Sigma[1, 2]
 
     var = diag(Sigma)

@@ -1,10 +1,11 @@
 ## Author: Patrick Chang
-# Script file for the MM Complex Fourier Transform (Dirichlet)
+# Script file for the MM NUFFT
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
-# Number of Fourier Coefficients automatically chosen so that events
-# are not aliased
+# Number of Fourier Coefficients used is length of data
+
+## Implementation uses FINUFFT package
 
 #---------------------------------------------------------------------------
 
@@ -14,10 +15,11 @@
 ## t = [n x m] matrix of trading times, non-trading times are indicated by NaNs
 # dimensions of p and t must match.
 ## N = Optional input for cutoff frequency
+## tol = error tolerance for NUFFT - determines how much spreading
 
 #---------------------------------------------------------------------------
 
-using ArgCheck; using LinearAlgebra
+using ArgCheck; using LinearAlgebra; using FINUFFT
 
 #---------------------------------------------------------------------------
 ### Supporting functions
@@ -32,10 +34,9 @@ end
 
 #---------------------------------------------------------------------------
 
-# Mancino Sanfelici implementation using for loops
-# with the Dirichlet Kernel
+# Non-uniform Fast Fourier Transform implementaion of the Fejer Kernel
 
-function MScorrDK(p, t; kwargs...)
+function NUFFTcorrFKFINUFFT(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -46,9 +47,12 @@ function MScorrDK(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -57,30 +61,46 @@ function MScorrDK(p, t; kwargs...)
     kwargs = Dict(kwargs)
 
     if haskey(kwargs, :N)
-        N = kwargs[:N]
+        k = collect(-kwargs[:N]:1:kwargs[:N])
     else
-        N = trunc(Int, floor(N0/2))
+        k = collect(-floor(N0/2):1:floor(N0/2))
     end
 
-    #------------------------------------------------------
+    if haskey(kwargs, :tol)
+        tol = kwargs[:tol]
+    else
+        tol = 10^-12
+    end
 
-    c_pos = zeros(ComplexF64, mp, 2*N + 1)
-    c_neg = zeros(ComplexF64, mp, 2*N + 1)
+    Den = length(k)
+
+    #------------------------------------------------------
+    e_pos = zeros(ComplexF64, mp, Den)
+    e_neg = zeros(ComplexF64, mp, Den)
 
     for i in 1:mp
         psii = findall(!isnan, p[:,i])
         P = p[psii, i]
         Time = tau[psii, i]
-        DiffP = diff(log.(P))
+        DiffP = complex(diff(log.(P)))
+        Time = Time[1:(end-1)]
 
-        for k=1:(2*N+1)
-            s=k-N-1;
-            c_neg[i, k]=sum(exp.((-1im*s).*Time[1:(end-1)]).*DiffP);
-            c_pos[i, k]=sum(exp.((1im*s).*Time[1:(end-1)]).*DiffP);
-        end
+        C = nufft1d1(Time, DiffP, -1, tol, Den)
+
+        e_pos[i,:] = C
+        e_neg[i,:] = conj(C)
     end
 
-    Sigma = 0.5 / (2*N + 1) .* (c_pos*c_pos' + c_neg*c_neg')
+    N = (Den-1)/2
+
+    Sigma = zeros(ComplexF64, mp, mp)
+    for i in 1:mp-1
+        for j in i+1:mp
+            Sigma[i,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[i,:] ) / (N+1)
+            Sigma[j,j] = sum( (1 .- abs.(k)./N) .* e_pos[j,:] .* e_neg[j,:] ) / (N+1)
+            Sigma[i,j] = Sigma[j,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[j,:] ) / (N+1)
+        end
+    end
 
     Sigma = real(Sigma)
     var = diag(Sigma)

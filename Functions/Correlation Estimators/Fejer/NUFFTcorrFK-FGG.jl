@@ -3,9 +3,10 @@
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
+#           - Fast Gaussian Gridding [GL] (Own implementaion)
 # Number of Fourier Coefficients used is length of data
 
-## Implementation uses FINUFFT package
+## Implementation uses Fast Gaussian Gridding
 
 #---------------------------------------------------------------------------
 
@@ -24,6 +25,8 @@ using ArgCheck; using LinearAlgebra; using FINUFFT
 #---------------------------------------------------------------------------
 ### Supporting functions
 
+include("../../NUFFT/NUFFT-FGG.jl")
+
 function scale(t)
     maxt = maximum(filter(!isnan, t))
     mint = minimum(filter(!isnan, t))
@@ -34,9 +37,9 @@ end
 
 #---------------------------------------------------------------------------
 
-# Non-uniform Fast Fourier Transform implementaion of the Dirichlet Kernel
+# Non-uniform Fast Fourier Transform implementaion of the Fejer Kernel
 
-function NUFFTcorrDKFINUFFT(p, t; kwargs...)
+function NUFFTcorrFKFGG(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -47,9 +50,12 @@ function NUFFTcorrDKFINUFFT(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -59,8 +65,10 @@ function NUFFTcorrDKFINUFFT(p, t; kwargs...)
 
     if haskey(kwargs, :N)
         k = collect(-kwargs[:N]:1:kwargs[:N])
+        N = kwargs[:N]
     else
         k = collect(-floor(N0/2):1:floor(N0/2))
+        N = floor(N0/2)
     end
 
     if haskey(kwargs, :tol)
@@ -82,15 +90,26 @@ function NUFFTcorrDKFINUFFT(p, t; kwargs...)
         DiffP = complex(diff(log.(P)))
         Time = Time[1:(end-1)]
 
-        C = nufft1d1(Time, DiffP, -1, tol, Den)
+        C = NUFFTFGG(DiffP, Time, Den, tol)
 
         e_pos[i,:] = C
         e_neg[i,:] = conj(C)
     end
 
-    Sigma = zeros(ComplexF64, mp, mp)
+    k = fftfreq(Den, 1) * Den
 
-    Sigma = 0.5 / Den .* (e_pos*e_pos' + e_neg*e_neg')
+    # ------------
+
+    Sigma = zeros(ComplexF64, mp, mp)
+    for i in 1:mp-1
+        for j in i+1:mp
+            Sigma[i,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[i,:] ) / (N+1)
+            Sigma[j,j] = sum( (1 .- abs.(k)./N) .* e_pos[j,:] .* e_neg[j,:] ) / (N+1)
+            Sigma[i,j] = Sigma[j,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[j,:] ) / (N+1)
+        end
+    end
+
+    # ------------
 
     Sigma = real(Sigma)
     var = diag(Sigma)

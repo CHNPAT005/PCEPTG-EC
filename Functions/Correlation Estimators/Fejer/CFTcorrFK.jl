@@ -31,11 +31,12 @@ function scale(t)
 end
 
 #---------------------------------------------------------------------------
+# Fejer Kernel implementaion
+# wave range from -N:N
+# Exploits c(-k) = \bar{c(k)} in the computation so that
+# we need only compute 1:N and sum(DiffP) for efficiency
 
-# Mancino Sanfelici implementation using for loops
-# with the Fejer Kernel
-
-function MScorrFK(p, t; kwargs...)
+function CFTcorrFK(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -46,9 +47,12 @@ function MScorrFK(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -62,10 +66,12 @@ function MScorrFK(p, t; kwargs...)
         N = trunc(Int, floor(N0/2))
     end
 
-    #------------------------------------------------------
+    k = collect(1:1:N)
+    Den = length(k)
 
-    c_pos = zeros(ComplexF64, mp, 2*N + 1)
-    c_neg = zeros(ComplexF64, mp, 2*N + 1)
+    #------------------------------------------------------
+    c_pos = zeros(ComplexF64, mp, 2*Den + 1)
+    c_neg = zeros(ComplexF64, mp, 2*Den + 1)
 
     for i in 1:mp
         psii = findall(!isnan, p[:,i])
@@ -73,14 +79,26 @@ function MScorrFK(p, t; kwargs...)
         Time = tau[psii, i]
         DiffP = diff(log.(P))
 
-        for k=1:(2*N+1)
-            s=k-N-1;
-            c_neg[i, k]= sqrt.(1 .- abs.(s)./N) * sum(exp.((-1im*s).*Time[1:(end-1)]).*DiffP);
-            c_pos[i, k]= sqrt.(1 .- abs.(s)./N) * sum(exp.((1im*s).*Time[1:(end-1)]).*DiffP);
+        C = DiffP' * exp.(-1im * Time[1:(end-1),:] * k')
+
+        c_pos[i,:] = [C sum(DiffP) conj(C)]
+        c_neg[i,:] = [conj(C) sum(DiffP) C]
+    end
+
+    k = [k; 0; k]
+
+    # ------------
+
+    Sigma = zeros(ComplexF64, mp, mp)
+    for i in 1:mp-1
+        for j in i+1:mp
+            Sigma[i,i] = sum( (1 .- abs.(k)./N) .* c_pos[i,:] .* c_neg[i,:] ) / (N+1)
+            Sigma[j,j] = sum( (1 .- abs.(k)./N) .* c_pos[j,:] .* c_neg[j,:] ) / (N+1)
+            Sigma[i,j] = Sigma[j,i] = sum( (1 .- abs.(k)./N) .* c_pos[i,:] .* c_neg[j,:] ) / (N+1)
         end
     end
 
-    Sigma = 0.5/(N+1) .* (c_pos*c_pos' + c_neg*c_neg')
+    # ------------
 
     Sigma = real(Sigma)
     var = diag(Sigma)

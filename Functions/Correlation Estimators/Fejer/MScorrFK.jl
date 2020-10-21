@@ -1,10 +1,10 @@
 ## Author: Patrick Chang
-# Script file for the MM Fast Fourier Transform with Zero Padding
+# Script file for the MM Complex Fourier Transform (Fejer)
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
-#           - Zero-padding function
-# Number of Fourier Coefficients used is length of data
+# Number of Fourier Coefficients automatically chosen so that events
+# are not aliased
 
 #---------------------------------------------------------------------------
 
@@ -13,11 +13,11 @@
 # non-trading times are indicated by NaNs
 ## t = [n x m] matrix of trading times, non-trading times are indicated by NaNs
 # dimensions of p and t must match.
+## N = Optional input for cutoff frequency
 
 #---------------------------------------------------------------------------
 
-using ArgCheck; using LinearAlgebra;
-using FFTW
+using ArgCheck; using LinearAlgebra
 
 #---------------------------------------------------------------------------
 ### Supporting functions
@@ -30,70 +30,60 @@ function scale(t)
     return tau
 end
 
-function zero_pad(cj, xj, N0)
-    res = zeros(N0, 1)
-    nj = length(xj)
-    for j in 1:nj
-        pos = Int(round(xj[j] * (N0/(2*pi))))
-        res[pos+1] = cj[j]
-    end
-    return res
-end
-#ZPP = zero_pad(DiffP, tau[psii, 1], Int(ceil(N0)))
 #---------------------------------------------------------------------------
 
-# Fast Fourier Transform (with Zero Padding) implementaion of the Dirichlet Kernel
-# Can be used for asynchronous data
-# No option for optional cutoff (N)
+# Mancino Sanfelici implementation using for loops
+# with the Fejer Kernel
 
-function FFTZPcorrDK(p, t)
+function MScorrFK(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
     nt = size(t)[1]
 
-    #@argcheck size(p) == size(t) DimensionMismatch
+    @argcheck size(p) == size(t) DimensionMismatch
 
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
 
-    k = collect(-floor(N0/2):1:floor(N0/2))
+    # Optional Cutoff - if not specified we use Nyquist Cutoff
+    kwargs = Dict(kwargs)
 
-    Den = length(k)
+    if haskey(kwargs, :N)
+        N = kwargs[:N]
+    else
+        N = trunc(Int, floor(N0/2))
+    end
 
     #------------------------------------------------------
-    c_pos = zeros(ComplexF64, mp, Den)
-    c_neg = zeros(ComplexF64, mp, Den)
+
+    c_pos = zeros(ComplexF64, mp, 2*N + 1)
+    c_neg = zeros(ComplexF64, mp, 2*N + 1)
 
     for i in 1:mp
         psii = findall(!isnan, p[:,i])
         P = p[psii, i]
-        DiffP = diff(log.(P))
-        psii = psii[1:(end-1)]
         Time = tau[psii, i]
-        ZP = zeros(Den, 1)
+        DiffP = diff(log.(P))
 
-        ZP[1:Int(floor(N0))] = zero_pad(DiffP, Time, Int(floor(N0)))
-
-        C = fft(ZP)
-
-        C_pos = C
-        C_neg = conj(C)
-
-        c_pos[i,:] = C_pos
-        c_neg[i,:] = C_neg
+        for k=1:(2*N+1)
+            s=k-N-1;
+            c_neg[i, k]= sqrt.(1 .- abs.(s)./N) * sum(exp.((-1im*s).*Time[1:(end-1)]).*DiffP);
+            c_pos[i, k]= sqrt.(1 .- abs.(s)./N) * sum(exp.((1im*s).*Time[1:(end-1)]).*DiffP);
+        end
     end
 
-    Sigma = zeros(ComplexF64, mp, mp)
-
-    Sigma = 0.5 / Den .* (c_pos*c_pos' + c_neg*c_neg')
+    Sigma = 0.5/(N+1) .* (c_pos*c_pos' + c_neg*c_neg')
 
     Sigma = real(Sigma)
     var = diag(Sigma)

@@ -3,10 +3,10 @@
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
-#           - Fast Gaussian Gridding [GL] (Own implementaion)
+#           - Exponential of Semi-Circle [BMK] (Own naive implementaion)
 # Number of Fourier Coefficients used is length of data
 
-## Implementation uses Fast Gaussian Gridding
+## Implementation uses Exponential of Semi-Circle
 
 #---------------------------------------------------------------------------
 
@@ -25,8 +25,7 @@ using ArgCheck; using LinearAlgebra; using FINUFFT
 #---------------------------------------------------------------------------
 ### Supporting functions
 
-# cd("/Users/patrickchang1/PCEPTG-MM-NUFFT")
-include("../../NUFFT/NUFFT-FGG")
+include("../../NUFFT/NUFFT-ES.jl")
 
 function scale(t)
     maxt = maximum(filter(!isnan, t))
@@ -40,7 +39,7 @@ end
 
 # Non-uniform Fast Fourier Transform implementaion of the Fejer Kernel
 
-function NUFFTcorrFKFGG(p, t; kwargs...)
+function NUFFTcorrFKES(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -51,9 +50,12 @@ function NUFFTcorrFKFGG(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -88,7 +90,7 @@ function NUFFTcorrFKFGG(p, t; kwargs...)
         DiffP = complex(diff(log.(P)))
         Time = Time[1:(end-1)]
 
-        C = NUFFTFGG(DiffP, Time, Den, tol)
+        C = NUFFTES(DiffP, Time, Den, tol)
 
         e_pos[i,:] = C
         e_neg[i,:] = conj(C)

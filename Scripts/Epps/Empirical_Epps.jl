@@ -7,10 +7,10 @@ using LinearAlgebra, Plots, LaTeXStrings, StatsBase, Intervals, JLD, ProgressMet
 
 cd("/Users/patrickchang1/PCEPTG-EC")
 
-include("../../Functions/Hawkes/Hawkes")
-include("../../Functions/SDEs/GBM")
-include("../../Functions/Correlation Estimators/Dirichlet/NUFFTcorrDK-FGG")
-include("../../Functions/Correlation Estimators/HY/HYcorr")
+include("../../Functions/Hawkes/Hawkes.jl")
+include("../../Functions/SDEs/GBM.jl")
+include("../../Functions/Correlation Estimators/Dirichlet/NUFFTcorrDK-FGG.jl")
+include("../../Functions/Correlation Estimators/HY/HYcorr.jl")
 
 #---------------------------------------------------------------------------
 ## RV correction
@@ -147,7 +147,35 @@ function computecorrs(data, T = 28200, dt = collect(1:1:400))
     return measured, prevtick, overlap, HY
 end
 
-# Streamline everything
+# Function to compute the HY estimates using k-skip sampling
+function computecorrs_kskip(data, T = 28200, kskip = collect(1:1:50))
+    m = size(data)[1]
+    HY = zeros(m, length(kskip))
+
+    @showprogress "Computing..." for k in 1:m
+        temp = data[k]
+        t1 = temp[findall(!isnan, temp[:,2]),1]
+        t2 = temp[findall(!isnan, temp[:,3]),1]
+
+        P1 = filter(!isnan, temp[:,2])
+        P2 = filter(!isnan, temp[:,3])
+        for i in 1:length(kskip)
+            t1_ind = collect(1:kskip[i]:length(t1))
+            t2_ind = collect(1:kskip[i]:length(t2))
+
+            t1_temp = t1[t1_ind]
+            t2_temp = t2[t2_ind]
+
+            P1_temp = P1[t1_ind]
+            P2_temp = P2[t2_ind]
+
+            HY[k,i] = HYcorr(P1_temp,P2_temp,t1_temp,t2_temp)[1][1,2]
+        end
+    end
+    return HY
+end
+
+# Streamline everything for computing correlations and corrections
 function Empirical(A1::Int64, A2::Int64, Fulldata)
     Data = Matrix{Float64}[] #Actually FSR/SBK
     for i in 1:length(days)
@@ -158,8 +186,20 @@ function Empirical(A1::Int64, A2::Int64, Fulldata)
     res = computecorrs(Data_fixed)
     return res
 end
+
+# Streamline everything for computing k-skip HY estimates
+function Empirical_kskip(A1::Int64, A2::Int64, Fulldata)
+    Data = Matrix{Float64}[] #Actually FSR/SBK
+    for i in 1:length(days)
+        p = Fulldata[i][:,[1;A1;A2]]
+        push!(Data, p)
+    end
+    Data_fixed = fixdata(Data)
+    res = computecorrs_kskip(Data_fixed)
+    return res
+end
 #---------------------------------------------------------------------------
-# Compute results
+# Compute results for correlations and corrections
 
 # Each take roughly 30 min
 SBKFSR = Empirical(7, 11, JSE_Data)
@@ -182,7 +222,7 @@ plot!(p1, dt, mean(SBKFSR[2], dims=2), ribbon=(q .* std(SBKFSR[2], dims = 2)), f
 plot!(p1, dt, mean(SBKFSR[3], dims=2), ribbon=(q .* std(SBKFSR[3], dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
 hline!(p1, [mean(SBKFSR[4])], ribbon=(q .* std(SBKFSR[4], dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p1, L"\Delta t\textrm{[sec]}")
-ylabel!(p1, L"\rho(\Delta t)")
+ylabel!(p1, L"\rho_{\Delta t}^{ij}")
 
 # savefig(p1, "Plots/Empirical/SBKFSRcorrection.svg")
 
@@ -191,7 +231,7 @@ plot!(p2, dt, mean(NEDABG[2], dims=2), ribbon=(q .* std(NEDABG[2], dims = 2)), f
 plot!(p2, dt, mean(NEDABG[3], dims=2), ribbon=(q .* std(NEDABG[3], dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
 hline!(p2, [mean(NEDABG[4])], ribbon=(q .* std(NEDABG[4], dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p2, L"\Delta t\textrm{[sec]}")
-ylabel!(p2, L"\rho(\Delta t)")
+ylabel!(p2, L"\rho_{\Delta t}^{ij}")
 
 # savefig(p2, "Plots/Empirical/NEDABGcorrection.svg")
 
@@ -200,7 +240,7 @@ plot!(p3, dt, mean(NEDABG[3], dims=2) ./ maximum(mean(NEDABG[1], dims=2)), color
 plot!(p3, dt, mean(SBKFSR[1], dims=2) ./ maximum(mean(SBKFSR[1], dims=2)), color = :blue, line=(1.5, [:dot]), label = L"\textrm{Measured SBK/FSR}", marker=([:+ :d],1,0,stroke(2,:blue)))
 plot!(p3, dt, mean(SBKFSR[3], dims=2) ./ maximum(mean(SBKFSR[1], dims=2)), color = :blue, line=(1.5, [:dot]), label = L"\textrm{Overlap correction SBK/FSR}", marker=([:circle :d],1,0,stroke(2,:blue)))
 xlabel!(p3, L"\Delta t\textrm{[sec]}")
-ylabel!(p3, L"\rho(\Delta t)")
+ylabel!(p3, L"\rho_{\Delta t}^{ij}")
 
 # savefig(p3, "Plots/Empirical/EmpComparison.svg")
 
@@ -223,3 +263,26 @@ xlabel!(p2, L"\Delta t\textrm{[sec]}")
 ylabel!(p2, L"\rho(\Delta t)")
 
 # savefig(p2, "Plots/Empirical/NEDABGcorrectionNOerrorbars.svg")
+
+#---------------------------------------------------------------------------
+# Compute results for k-skip HY
+
+SBKFSR_kskip = Empirical_kskip(7, 11, JSE_Data)
+NEDABG_kskip = Empirical_kskip(8, 9, JSE_Data)
+
+# Save and Load
+save("Computed Data/EppsCorrection/Empirical_kskip.jld", "SBKFSR_kskip", SBKFSR_kskip, "NEDABG_kskip", NEDABG_kskip)
+
+ComputedResults_kskip = load("Computed Data/EppsCorrection/Empirical_kskip.jld")
+SBKFSR_kskip = ComputedResults_kskip["SBKFSR_kskip"]
+NEDABG_kskip = ComputedResults_kskip["NEDABG_kskip"]
+
+# Plots
+kskip = collect(1:1:50)
+
+p4 = plot(kskip, mean(SBKFSR_kskip, dims=1)', legend = :bottomright, color = :blue, line=(1, [:solid]), label = L"\textrm{HY SBK/FSR}", marker=([:+ :d],1,0,stroke(2,:blue)), dpi = 300)
+plot!(p4, kskip, mean(NEDABG_kskip, dims=1)', color = :red, line=(1, [:solid]), label = L"\textrm{HY NED/ABG}", marker=([:circle :d],1,0,stroke(2,:red)), dpi = 300)
+xlabel!(p4, L"\textrm{k-skip}")
+ylabel!(p4, L"\rho(\textrm{k})")
+
+# savefig(p4, "Plots/Empirical/Empirical_kskip.svg")

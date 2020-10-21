@@ -51,8 +51,8 @@ end
 ## Simulation Function
 
 # lambda0 = vector of baseline intensities
-# beta = DxD matrix of excitation (double floats)
-# alpha = DxD matrix of rates of relaxation (double floats)
+# alpha = DxD matrix of excitation (double floats)
+# beta = DxD matrix of rates of relaxation (double floats)
 
 # Returns vectors of sampled times from the multivariate
 # D-type Hawkes process

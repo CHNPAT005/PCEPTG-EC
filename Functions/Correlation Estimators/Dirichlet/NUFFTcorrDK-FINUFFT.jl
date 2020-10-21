@@ -1,10 +1,11 @@
 ## Author: Patrick Chang
-# Script file for the MM Complex Fourier Transform (Dirichlet)
+# Script file for the MM NUFFT
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
-# Number of Fourier Coefficients automatically chosen so that events
-# are not aliased
+# Number of Fourier Coefficients used is length of data
+
+## Implementation uses FINUFFT package
 
 #---------------------------------------------------------------------------
 
@@ -14,10 +15,11 @@
 ## t = [n x m] matrix of trading times, non-trading times are indicated by NaNs
 # dimensions of p and t must match.
 ## N = Optional input for cutoff frequency
+## tol = error tolerance for NUFFT - determines how much spreading
 
 #---------------------------------------------------------------------------
 
-using ArgCheck; using LinearAlgebra
+using ArgCheck; using LinearAlgebra; using FINUFFT
 
 #---------------------------------------------------------------------------
 ### Supporting functions
@@ -31,12 +33,10 @@ function scale(t)
 end
 
 #---------------------------------------------------------------------------
-# Dirichlet Kernel implementaion
-# wave range from -N:N
-# Exploits c(-k) = \bar{c(k)} in the computation so that
-# we need only compute 1:N and sum(DiffP) for efficiency
 
-function CFTcorrDK(p, t; kwargs...)
+# Non-uniform Fast Fourier Transform implementaion of the Dirichlet Kernel
+
+function NUFFTcorrDKFINUFFT(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -47,9 +47,12 @@ function CFTcorrDK(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -58,31 +61,39 @@ function CFTcorrDK(p, t; kwargs...)
     kwargs = Dict(kwargs)
 
     if haskey(kwargs, :N)
-        k = collect(1:1:kwargs[:N])
+        k = collect(-kwargs[:N]:1:kwargs[:N])
     else
-        k = collect(1:1:floor(N0/2))
+        k = collect(-floor(N0/2):1:floor(N0/2))
+    end
+
+    if haskey(kwargs, :tol)
+        tol = kwargs[:tol]
+    else
+        tol = 10^-12
     end
 
     Den = length(k)
 
     #------------------------------------------------------
-
-    c_pos = zeros(ComplexF64, mp, 2*Den + 1)
-    c_neg = zeros(ComplexF64, mp, 2*Den + 1)
+    e_pos = zeros(ComplexF64, mp, Den)
+    e_neg = zeros(ComplexF64, mp, Den)
 
     for i in 1:mp
         psii = findall(!isnan, p[:,i])
         P = p[psii, i]
         Time = tau[psii, i]
-        DiffP = diff(log.(P))
+        DiffP = complex(diff(log.(P)))
+        Time = Time[1:(end-1)]
 
-        C = DiffP' * exp.(-1im * Time[1:(end-1),:] * k')
+        C = nufft1d1(Time, DiffP, -1, tol, Den)
 
-        c_pos[i,:] = [C sum(DiffP) conj(C)]
-        c_neg[i,:] = [conj(C) sum(DiffP) C]
+        e_pos[i,:] = C
+        e_neg[i,:] = conj(C)
     end
 
-    Sigma = 0.5 / (2*Den + 1) .* (c_pos*c_pos' + c_neg*c_neg')
+    Sigma = zeros(ComplexF64, mp, mp)
+
+    Sigma = 0.5 / Den .* (e_pos*e_pos' + e_neg*e_neg')
 
     Sigma = real(Sigma)
     var = diag(Sigma)

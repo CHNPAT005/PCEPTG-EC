@@ -1,10 +1,12 @@
 ## Author: Patrick Chang
-# Script file for the MM Complex Fourier Transform (Fejer)
+# Script file for the MM NUFFT
 # Supporting Algorithms are at the start of the script
 #  Include:
 #           - Scale function to re-scale time to [0, 2 \pi]
-# Number of Fourier Coefficients automatically chosen so that events
-# are not aliased
+#           - Kaiser-Bessel implementation
+# Number of Fourier Coefficients used is length of data
+
+## Implementation uses Kaiser-Bessel implementation
 
 #---------------------------------------------------------------------------
 
@@ -14,13 +16,16 @@
 ## t = [n x m] matrix of trading times, non-trading times are indicated by NaNs
 # dimensions of p and t must match.
 ## N = Optional input for cutoff frequency
+## tol = error tolerance for NUFFT - determines how much spreading
 
 #---------------------------------------------------------------------------
 
-using ArgCheck; using LinearAlgebra
+using ArgCheck; using LinearAlgebra; using FINUFFT
 
 #---------------------------------------------------------------------------
 ### Supporting functions
+
+include("../../NUFFT/NUFFT-KB.jl")
 
 function scale(t)
     maxt = maximum(filter(!isnan, t))
@@ -31,12 +36,10 @@ function scale(t)
 end
 
 #---------------------------------------------------------------------------
-# Fejer Kernel implementaion
-# wave range from -N:N
-# Exploits c(-k) = \bar{c(k)} in the computation so that
-# we need only compute 1:N and sum(DiffP) for efficiency
 
-function CFTcorrFK(p, t; kwargs...)
+# Non-uniform Fast Fourier Transform implementaion of the Fejer Kernel
+
+function NUFFTcorrFKKB(p, t; kwargs...)
     ## Pre-allocate arrays and check Data
     np = size(p)[1]
     mp = size(p)[2]
@@ -47,9 +50,12 @@ function CFTcorrFK(p, t; kwargs...)
     # Re-scale trading times
     tau = scale(t)
     # Computing minimum time change
-    # minumum step size to avoid smoothing
-    dtau = diff(filter(!isnan, tau))
-    taumin = minimum(filter((x) -> x>0, dtau))
+    dtau = zeros(mp,1)
+    for i in 1:mp
+        dtau[i] = minimum(diff(filter(!isnan, tau[:,i])))
+    end
+    # maximum of minumum step size to avoid aliasing
+    taumin = maximum(dtau)
     taumax = 2*pi
     # Sampling Freq.
     N0 = taumax/taumin
@@ -58,40 +64,48 @@ function CFTcorrFK(p, t; kwargs...)
     kwargs = Dict(kwargs)
 
     if haskey(kwargs, :N)
+        k = collect(-kwargs[:N]:1:kwargs[:N])
         N = kwargs[:N]
     else
-        N = trunc(Int, floor(N0/2))
+        k = collect(-floor(N0/2):1:floor(N0/2))
+        N = floor(N0/2)
     end
 
-    k = collect(1:1:N)
+    if haskey(kwargs, :tol)
+        tol = kwargs[:tol]
+    else
+        tol = 10^-12
+    end
+
     Den = length(k)
 
     #------------------------------------------------------
-    c_pos = zeros(ComplexF64, mp, 2*Den + 1)
-    c_neg = zeros(ComplexF64, mp, 2*Den + 1)
+    e_pos = zeros(ComplexF64, mp, Den)
+    e_neg = zeros(ComplexF64, mp, Den)
 
     for i in 1:mp
         psii = findall(!isnan, p[:,i])
         P = p[psii, i]
         Time = tau[psii, i]
-        DiffP = diff(log.(P))
+        DiffP = complex(diff(log.(P)))
+        Time = Time[1:(end-1)] ./ (2*pi)# .- 0.5
 
-        C = DiffP' * exp.(-1im * Time[1:(end-1),:] * k')
+        C = NUFFTKB(DiffP, Time, Den, tol)
 
-        c_pos[i,:] = [C sum(DiffP) conj(C)]
-        c_neg[i,:] = [conj(C) sum(DiffP) C]
+        e_pos[i,:] = C
+        e_neg[i,:] = conj(C)
     end
 
-    k = [k; 0; k]
+    k = fftfreq(Den, 1) * Den
 
     # ------------
 
     Sigma = zeros(ComplexF64, mp, mp)
     for i in 1:mp-1
         for j in i+1:mp
-            Sigma[i,i] = sum( (1 .- abs.(k)./N) .* c_pos[i,:] .* c_neg[i,:] ) / (N+1)
-            Sigma[j,j] = sum( (1 .- abs.(k)./N) .* c_pos[j,:] .* c_neg[j,:] ) / (N+1)
-            Sigma[i,j] = Sigma[j,i] = sum( (1 .- abs.(k)./N) .* c_pos[i,:] .* c_neg[j,:] ) / (N+1)
+            Sigma[i,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[i,:] ) / (N+1)
+            Sigma[j,j] = sum( (1 .- abs.(k)./N) .* e_pos[j,:] .* e_neg[j,:] ) / (N+1)
+            Sigma[i,j] = Sigma[j,i] = sum( (1 .- abs.(k)./N) .* e_pos[i,:] .* e_neg[j,:] ) / (N+1)
         end
     end
 

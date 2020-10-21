@@ -4,7 +4,7 @@
 #---------------------------------------------------------------------------
 
 using Plots, LaTeXStrings, Optim
-include("../Functions/Hawkes/Hawkes1D")
+include("../Functions/Hawkes/Hawkes1D.jl")
 
 #---------------------------------------------------------------------------
 ## Testing the functions
