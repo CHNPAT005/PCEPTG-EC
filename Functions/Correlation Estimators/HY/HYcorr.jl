@@ -20,9 +20,9 @@ function Kanatani(t1, t2)
     W = zeros(L1-1, L2-1)
 
     for i in 1:(L1-1)
-        I1 = Interval(t1[i], t1[i+1], false, true)
+        I1 = Interval{Open, Closed}(t1[i], t1[i+1])
         for j in 1:(L2-1)
-            I2 = Interval(t2[j], t2[j+1], false, true)
+            I2 = Interval{Open, Closed}(t2[j], t2[j+1])
             if !isempty(intersect(I1,I2))
                 W[i,j] = 1
             end
