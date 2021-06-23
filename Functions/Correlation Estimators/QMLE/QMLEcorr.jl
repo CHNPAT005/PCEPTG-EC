@@ -17,26 +17,19 @@ function log_likelihood(X, Δ, log_param)
     Y = diff(X, dims = 1)
     # Get number of obs
     n = length(Y)
+    # Create the diagonal and superdiagonal of Ω
+    dv = repeat([σ2*Δ + 2*a2], n)
+    ev = repeat([-a2], n-1)
     # Initialise Ω
-    Ω = zeros(n, n)
-    # Populate Ω
-    for i in 1:n
-        # Fill in the diagonal
-        Ω[i,i] = σ2*Δ + 2*a2
-    end
-    for i in 2:n
-        # Fill in the off diagonals
-        Ω[i,i-1] = -a2
-        Ω[i-1,i] = -a2
-    end
-
+    Ω = SymTridiagonal(dv, ev)
+    # Compute log-likelihood
     llike = -0.5*logdet(Ω) - n/2 * log(2*pi) - 0.5 * (Y'*inv(Ω)*Y)[1]
     return -llike
 end
 
-function QMLEvar(X, Δ)
+function QMLEvar(X, Δ, starting)
     # Optimise the log-likelihood
-    opt = optimize(vars -> log_likelihood(X, Δ, vars), [log(0.1); log(0.1)], NelderMead())
+    opt = optimize(vars -> log_likelihood(X, Δ, vars), starting, NelderMead())
     # Extract parameters, dont forget to exponentiate!
     param = Optim.minimizer(opt)
     return exp.(param)[1]
@@ -44,19 +37,19 @@ end
 
 #---------------------------------------------------------------------------
 
-function QMLEcorr(p1, p2, Δ)
+function QMLEcorr(p1, p2, Δ, starting)
     # Get the variances
-    V1 = QMLEvar(log.(p1), Δ); V2 = QMLEvar(log.(p2), Δ)
-    Covar = 0.25 * (QMLEvar(log.(p1) .+ log.(p2), Δ) - QMLEvar(log.(p1) .- log.(p2), Δ))
+    V1 = QMLEvar(log.(p1), Δ, starting); V2 = QMLEvar(log.(p2), Δ, starting)
+    Covar = 0.25 * (QMLEvar(log.(p1) .+ log.(p2), Δ, starting) - QMLEvar(log.(p1) .- log.(p2), Δ, starting))
     ρ = Covar / (sqrt(V1) * sqrt(V2))
     return ρ
 end
 
 
-# ## Testing
-#
-# T = 3600#*20
-# ρ = 0.35#theoreticalCorr(0.023, 0.05, 0.11)
+## Testing
+
+# T = Int(3600*6.5)
+# ρ = 0.35
 #
 # mu = [0.01/86400, 0.01/86400]
 # sigma = [0.1/86400 sqrt(0.1/86400)*ρ*sqrt(0.2/86400);
@@ -65,21 +58,10 @@ end
 # P_GBM = GBM(T+1, mu, sigma)
 #
 #
-#
-# @elapsed test = QMLEcorr(P_GBM[:,1], P_GBM[:,2], 1)
-#
-#
 # p1 = P_GBM[:,1]; p2 = P_GBM[:,2];  Δ = 1
-#
 # X = log.(p1)
-# P_GBM[:,1]
-# test = diff(log.(P_GBM[:,1]), dims = 1)
-# # X = GBM(501, [0.01/86400], [0.1/86400])
-# # Δ = 1;
-# log_param = [log(0.1); log(0.1)]
-# #
-# # @elapsed log_likelihood(X, Δ, log_param)
-# # test'*test
+# log_param = [log(0.1/86400); log(0.1/86400)]
 #
-#
-# log_likelihood(X, Δ, [log(0.1); log(0.1)])
+# @elapsed log_likelihood(X, Δ, log_param)
+# @elapsed testvar = QMLEvar(X, Δ, log_param)
+# @elapsed testcor = QMLEcorr(P_GBM[:,1], P_GBM[:,2], Δ, log_param)

@@ -206,39 +206,48 @@ SBKFSR = Empirical(7, 11, JSE_Data)
 NEDABG = Empirical(8, 9, JSE_Data)
 
 # Save and Load
-save("Computed Data/EppsCorrection/Empirical.jld", "SBKFSR", SBKFSR, "NEDABG", NEDABG)
+save("Computed Data/EppsCorrection/Empirical_SBKFSR.jld", "SBKFSR_RV", SBKFSR[1], "SBKFSR_FT", SBKFSR[2], "SBKFSR_OC", SBKFSR[3], "SBKFSR_HY", SBKFSR[4])
+save("Computed Data/EppsCorrection/Empirical_NEDABG.jld", "NEDABG_RV", NEDABG[1], "NEDABG_FT", NEDABG[2], "NEDABG_OC", NEDABG[3], "NEDABG_HY", NEDABG[4])
 
-ComputedResults = load("Computed Data/EppsCorrection/Empirical.jld")
-SBKFSR = ComputedResults["SBKFSR"]
-NEDABG = ComputedResults["NEDABG"]
+ComputedResults_SBKFSR = load("Computed Data/EppsCorrection/Empirical_SBKFSR.jld")
+SBKFSR_RV = ComputedResults_SBKFSR["SBKFSR_RV"]
+SBKFSR_FT = ComputedResults_SBKFSR["SBKFSR_FT"]
+SBKFSR_OC = ComputedResults_SBKFSR["SBKFSR_OC"]
+SBKFSR_HY = ComputedResults_SBKFSR["SBKFSR_HY"]
+
+ComputedResults_NEDABG = load("Computed Data/EppsCorrection/Empirical_NEDABG.jld")
+NEDABG_RV = ComputedResults_NEDABG["NEDABG_RV"]
+NEDABG_FT = ComputedResults_NEDABG["NEDABG_FT"]
+NEDABG_OC = ComputedResults_NEDABG["NEDABG_OC"]
+NEDABG_HY = ComputedResults_NEDABG["NEDABG_HY"]
 
 # Plots
 dt = collect(1:1:400)
 m = size(JSE_Data)[1]
 q = quantile.(TDist(m-1), [0.975])
 
-p1 = plot(dt, mean(SBKFSR[1], dims=2), ribbon=(q .* std(SBKFSR[1], dims = 2)), fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0.1, 1.55))
-plot!(p1, dt, mean(SBKFSR[2], dims=2), ribbon=(q .* std(SBKFSR[2], dims = 2)), fillalpha=.15, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p1, dt, mean(SBKFSR[3], dims=2), ribbon=(q .* std(SBKFSR[3], dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p1, [mean(SBKFSR[4])], ribbon=(q .* std(SBKFSR[4], dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
+p1 = plot(dt, mean(SBKFSR_RV, dims=2), ribbon=(q .* std(SBKFSR_RV, dims = 2)), fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0.1, 1.55), size = (600, 500))
+plot!(p1, dt, mean(SBKFSR_FT, dims=2), ribbon=(q .* std(SBKFSR_FT, dims = 2)), fillalpha=.15, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
+plot!(p1, dt, mean(SBKFSR_OC, dims=2), ribbon=(q .* std(SBKFSR_OC, dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
+hline!(p1, [mean(SBKFSR_HY)], ribbon=(q .* std(SBKFSR_HY, dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p1, L"\Delta t\textrm{[sec]}")
 ylabel!(p1, L"\rho_{\Delta t}^{ij}")
 
 # savefig(p1, "Plots/Empirical/SBKFSRcorrection.svg")
 
-p2 = plot(dt, mean(NEDABG[1], dims=2), ribbon=(q .* std(NEDABG[1], dims = 2)), fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0.1, 1.55))
-plot!(p2, dt, mean(NEDABG[2], dims=2), ribbon=(q .* std(NEDABG[2], dims = 2)), fillalpha=.15, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p2, dt, mean(NEDABG[3], dims=2), ribbon=(q .* std(NEDABG[3], dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p2, [mean(NEDABG[4])], ribbon=(q .* std(NEDABG[4], dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
+p2 = plot(dt, mean(NEDABG_RV, dims=2), ribbon=(q .* std(NEDABG_RV, dims = 2)), fillalpha=.15, legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0.1, 1.55), size = (600, 500))
+plot!(p2, dt, mean(NEDABG_FT, dims=2), ribbon=(q .* std(NEDABG_FT, dims = 2)), fillalpha=.15, color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
+plot!(p2, dt, mean(NEDABG_OC, dims=2), ribbon=(q .* std(NEDABG_OC, dims = 2)), fillalpha=.15, color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
+hline!(p2, [mean(NEDABG_HY)], ribbon=(q .* std(NEDABG_HY, dims = 1)), fillalpha=.15, color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p2, L"\Delta t\textrm{[sec]}")
 ylabel!(p2, L"\rho_{\Delta t}^{ij}")
 
 # savefig(p2, "Plots/Empirical/NEDABGcorrection.svg")
 
-p3 = plot(dt, mean(NEDABG[1], dims=2) ./ maximum(mean(NEDABG[1], dims=2)), legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured NED/ABG}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.2))
-plot!(p3, dt, mean(NEDABG[3], dims=2) ./ maximum(mean(NEDABG[1], dims=2)), color = :red, line=(1, [:solid]), label = L"\textrm{Overlap correction NED/ABG}", marker=([:circle :d],1,0,stroke(2,:red)))
-plot!(p3, dt, mean(SBKFSR[1], dims=2) ./ maximum(mean(SBKFSR[1], dims=2)), color = :blue, line=(1.5, [:dot]), label = L"\textrm{Measured SBK/FSR}", marker=([:+ :d],1,0,stroke(2,:blue)))
-plot!(p3, dt, mean(SBKFSR[3], dims=2) ./ maximum(mean(SBKFSR[1], dims=2)), color = :blue, line=(1.5, [:dot]), label = L"\textrm{Overlap correction SBK/FSR}", marker=([:circle :d],1,0,stroke(2,:blue)))
+p3 = plot(dt, mean(NEDABG_RV, dims=2) ./ maximum(mean(NEDABG_RV, dims=2)), legend = :bottomright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured NED/ABG}", marker=([:+ :d],2,0,stroke(2,:red)), dpi = 300, ylims = (0, 1.2), size = (600, 500))
+plot!(p3, dt, mean(NEDABG_OC, dims=2) ./ maximum(mean(NEDABG_RV, dims=2)), color = :red, line=(1.5, [:dot]), label = L"\textrm{Overlap correction NED/ABG}", marker=([:circle :d],2,0,stroke(2,:red)))
+plot!(p3, dt, mean(SBKFSR_RV, dims=2) ./ maximum(mean(SBKFSR_RV, dims=2)), color = :blue, line=(1, [:solid]), label = L"\textrm{Measured SBK/FSR}", marker=([:+ :d],2,0,stroke(2,:blue)))
+plot!(p3, dt, mean(SBKFSR_OC, dims=2) ./ maximum(mean(SBKFSR_RV, dims=2)), color = :blue, line=(1.5, [:dot]), label = L"\textrm{Overlap correction SBK/FSR}", marker=([:circle :d],2,0,stroke(2,:blue)))
 xlabel!(p3, L"\Delta t\textrm{[sec]}")
 ylabel!(p3, L"\rho_{\Delta t}^{ij}")
 
@@ -246,19 +255,19 @@ ylabel!(p3, L"\rho_{\Delta t}^{ij}")
 
 
 # No error bars
-p1 = plot(dt, mean(SBKFSR[1], dims=2), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0, 2.5))
-plot!(p1, dt, mean(SBKFSR[2], dims=2), color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p1, dt, mean(SBKFSR[3], dims=2), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p1, [mean(SBKFSR[4])], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
+p1 = plot(dt, mean(SBKFSR_RV, dims=2), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0, 2.5), size = (600, 500))
+plot!(p1, dt, mean(SBKFSR_FT, dims=2), color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
+plot!(p1, dt, mean(SBKFSR_OC, dims=2), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
+hline!(p1, [mean(SBKFSR_HY)], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p1, L"\Delta t\textrm{[sec]}")
 ylabel!(p1, L"\rho(\Delta t)")
 
 # savefig(p1, "Plots/Empirical/SBKFSRcorrectionNOerrorbars.svg")
 
-p2 = plot(dt, mean(NEDABG[1], dims=2), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0, 2.5))
-plot!(p2, dt, mean(NEDABG[2], dims=2), color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
-plot!(p2, dt, mean(NEDABG[3], dims=2), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
-hline!(p2, [mean(NEDABG[4])], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
+p2 = plot(dt, mean(NEDABG_RV, dims=2), legend = :topright, color = :red, line=(1, [:solid]), label = L"\textrm{Measured}", marker=([:+ :d],1,0,stroke(2,:red)), dpi = 300, ylims = (-0, 2.5), size = (600, 500))
+plot!(p2, dt, mean(NEDABG_FT, dims=2), color = :blue, line=(1, [:solid]), label = L"\textrm{Flat trade correction}", marker=([:x :d],1,0,stroke(2,:blue)))
+plot!(p2, dt, mean(NEDABG_OC, dims=2), color = :green, line=(1, [:solid]), label = L"\textrm{Overlap correction}", marker=([:circle :d],1,0,stroke(2,:green)))
+hline!(p2, [mean(NEDABG_HY)], color = :brown, line=(1, [:dash]), label = L"\textrm{HY}")
 xlabel!(p2, L"\Delta t\textrm{[sec]}")
 ylabel!(p2, L"\rho(\Delta t)")
 
@@ -280,7 +289,7 @@ NEDABG_kskip = ComputedResults_kskip["NEDABG_kskip"]
 # Plots
 kskip = collect(1:1:50)
 
-p4 = plot(kskip, mean(SBKFSR_kskip, dims=1)', legend = :bottomright, color = :blue, line=(1, [:solid]), label = L"\textrm{HY SBK/FSR}", marker=([:+ :d],1,0,stroke(2,:blue)), dpi = 300)
+p4 = plot(kskip, mean(SBKFSR_kskip, dims=1)', legend = :bottomright, color = :blue, line=(1, [:solid]), label = L"\textrm{HY SBK/FSR}", marker=([:+ :d],1,0,stroke(2,:blue)), dpi = 300, size = (600, 500))
 plot!(p4, kskip, mean(NEDABG_kskip, dims=1)', color = :red, line=(1, [:solid]), label = L"\textrm{HY NED/ABG}", marker=([:circle :d],1,0,stroke(2,:red)), dpi = 300)
 xlabel!(p4, L"\textrm{k-skip}")
 ylabel!(p4, L"\rho(\textrm{k})")
