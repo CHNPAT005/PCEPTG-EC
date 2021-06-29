@@ -58,10 +58,23 @@ function SVwNoise(T, ρ; seed = 1, d = 2)
 end
 
 # test = SVwNoise(23400, 0.35)
-# t = [collect(1:1:23400) collect(1:1:23400)]
+# P = test[1]
+# t = [collect(1:1:23400.0) collect(1:1:23400.0)]
 #
-# testcor1 = NUFFTcorrDKFGG(test[1], t)[1][1,2]
-# testcor2 = NUFFTcorrDKFGG(test[2], t)[1][1,2]
-# testcor3 = NUFFTcorrDKFGG(test[2], t)[2]
+# testcor1 = NUFFTcorrDKFGG(P, t)[1][1,2]
+# testcor2 = NUFFTcorrDKFGG(P, t)[1][1,2]
+# testcor3 = NUFFTcorrDKFGG(P, t)[2]
 #
-# testcor4 = KEM(test[1], testcor3, testcor3, 300, 1e-5)
+# testcor4 = KEM(P, testcor3, testcor3, 300, 1e-5)
+#
+#
+# rm1 = sample(2:23400, 9360, replace = false)
+# rm2 = sample(2:23400, 9360, replace = false)
+#
+# P[rm1, 1] .= NaN
+# t[rm1, 1] .= NaN
+# P[rm2, 2] .= NaN
+# t[rm2, 2] .= NaN
+#
+# testcor5 = KEM(P, testcor3, testcor3, 300, 1e-5)
+# testcor6 = NUFFTcorrDKFGG(P, t)[1][1,2]
